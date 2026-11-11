@@ -1,0 +1,18 @@
+{
+  "name": "absurdity-engine-v9-labyrinth",
+  "version": "9.2.0",
+  "description": "The Absurdity Bureau: The Showroom Labyrinth, headless Three.js renderer",
+  "main": "labyrinth_renderer.js",
+  "scripts": {
+    "spot": "node labyrinth_renderer.js --root ../assets --spot 400,920,2050,3020,6100",
+    "strip": "node labyrinth_renderer.js --root ../assets --strip",
+    "master": "node labyrinth_renderer.js --root ../assets --master --pipe",
+    "serve": "node labyrinth_renderer.js --root ../assets --serve"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^23.11.1",
+    "three": "^0.169.0"
+  }
+}

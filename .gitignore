@@ -1,0 +1,7 @@
+node_modules/
+renders/
+renders_dev/
+*.wav
+*.mkv
+*.mp4
+assets/*.png
