@@ -59,3 +59,24 @@ MAP, MAP_ORBIT, SCAN, LOCK, CHASE, CHASE_FAST, CHASE_LOW, SCROLL, TOP_TIGHT, CLO
 ## Patches
 
 `patch_v9b_doom_pac.py` is the v9a to v9b change set, kept for audit. `labyrinth_renderer.js` already includes it.
+
+## v9c: skeletal push walk (2D drawing, bone-driven)
+
+When Wolfgang pushes the trolley side-on, the engine no longer shows a static frame. It uses a `THREE.SkinnedMesh` built from `atlas_map.json` → `rigs.push`:
+
+- **Skeleton:** 16 bones: root, trolley, hip, spine, chest, head, coat, three tail bones, and thigh/shin/foot for each leg.
+- **Mesh:** a 6-pixel grid over the drawing with up to 4 weights per vertex. Built offline by `tools/rig_build.py` from three things:
+  - region rules;
+  - distance to each bone chain;
+  - a luminance test that separates the near-black trousers and boots from the mid-grey coat, after an 11-pixel median filter so ink lines don't count.
+- **Weight-map check image:** `docs/rig_push_weights.png`.
+
+**Gait:**
+- One step every 2 beats, so footfalls land on beats 1 and 3. The 6-frame walk cycles now use the same cadence.
+- Leaning-trudge model: each leg swings ±16° about its own drawn angle, in antiphase, so the legs never cross under the coat. A 0.55 rad knee flex lifts the leg that is moving forward, and the feet stay flat.
+- 2D forward kinematics solve the hip height every frame so the lowest foot always touches the floor, which gives a natural hip drop on each contact.
+- Secondary motion: spine bob, head nod, coat sway, and a tail wave with follow-through lag.
+- The trolley bone stays rigid and the hands keep their grip.
+- Swing amplitude scales with his actual speed, so standing still holds the drawn pose.
+
+**Applying the changes:** `patch_v9c_skeletal_push.py` is the v9b to v9c change set. After editing joint positions, re-run `python3 tools/rig_build.py --preview` from the folder holding the atlases.
