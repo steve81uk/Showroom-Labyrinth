@@ -123,3 +123,20 @@ v9c bent the single push drawing, so its legs could never pass each other. v9d r
 - Moving extras: a runaway trolley rolling across the lot, and a car reversing out of its bay with reverse lights on.
 
 **Debug flags** (set via `EXTRA_Q`): `&mouth=1` forces the mouth open, `&mouth=0` forces it closed.
+
+## v9f: photoreal car park
+
+- **Backdrop and reflections:** `scene_background.png` comes from the CC0 `mall_parking_lot` HDRI, with the branded mall painted out. It's the outdoor backdrop and the reflection source for paint and glass. Indoors still uses RoomEnvironment.
+- **Sun:** the sun light uses the HDRI's measured sun (azimuth 36.0°, elevation 19.6°), so the shadows match the photographed sky. The outdoor shadow area is widened to ±38 m.
+- **Cars rebuilt the way real cars are modelled:**
+  - a lower shell to the belt line, plus a glasshouse with tumblehome (black trim frame, glass, roof panel, A/B/C pillars);
+  - door seams, chrome handles, sills, front and rear bumpers, a honeycomb grille with chrome surround and badge;
+  - lensed headlights with running-light strips and indicators, tail lights with reverse lamps (lit when reversing);
+  - wipers, roof rails (SUV and van), a shark-fin aerial;
+  - lathe-profiled tyres with sidewalls, five-spoke rims, lug nuts, brake discs, coloured calipers, wheel-arch liners;
+  - UK plates (white front, yellow rear);
+  - clear-coat paint with per-car roughness.
+- **CC0 props:** cars under tarps, Victorian street lamps and old tyres (see `docs/THIRD_PARTY_ASSETS.md`).
+- **Removed:** my low-poly trees and grey poles, which clashed with the real trees and lamps in the photo.
+- **SMAA anti-aliasing** for clean car edges.
+- **Debug:** `EXTRA_Q="&cam=px,py,pz,lx,ly,lz,fov"` overrides the camera for close inspection. The engine report now includes `exit_x` and `store_front_z`.

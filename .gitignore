@@ -5,3 +5,6 @@ renders_dev/
 *.mkv
 *.mp4
 assets/*.png
+props/
+scene_background.png
+*.hdr
