@@ -35,7 +35,7 @@ This section was added after inspecting real files. It does not change the shot 
 
 - **Audio:** `audio_master.wav` is the Suno WAV download (clip bff0ed1e). It is 48 kHz s16 stereo, 213.2 s, -15.9 LUFS integrated and -4.0 dBTP true peak. sha256 `eef852af2cc3e2c1cb888f27a2a399442e5791846412916daaec9857baf5b5c0`.
 - **BPM:** settled at 178.9, measured from the audio. The Suno beat grid gives 178.9 and librosa (hop 480) agrees, so 176 was the brief's value, not the track's. The engine times everything from `acoustic.beats_s` in `assets/manifest.json`, never from a BPM constant.
-- **Atlases (v2, current):** `Master_Sprite_Atlas.png` (sha256 `6343a37ee8f7a361…cbf`) and `Master_Normal_Atlas.png` (sha256 `ce00573d92106c07…072`). Both are 4096x4096: the 41 original cells plus the `push_body` and `leg` cutout cells. The v1 atlases (`dacca91b…`, `72ae296e…`) are superseded. They stay out of git per `.gitignore` and are in `Bureau_Asset_Pack_v1_2026-11-11.zip`.
+- **Atlases (v2, current):** `Master_Sprite_Atlas.png` (sha256 `6343a37ee8f7a361…cbf`) and `Master_Normal_Atlas.png` (sha256 `ce00573d92106c07…072`). Both are 4096x4096: the 41 original cells plus the `push_body` and `leg` cutout cells. The v1 atlases (`dacca91b…`, `72ae296e…`) are superseded. They stay out of git per `.gitignore`. The v2 set is in `Bureau_Asset_Pack_v2_2026-11-11.zip` (atlases, atlas_map.json, rig and pack tools).
 - **atlas_map.json:** carries `rigs.push_body` (body, 11 bones) and `rigs.leg` (3 bones, used twice). Together they make the v9d cutout walk. The v9c single-mesh `rigs.push` is removed.
 - **Rendered and checked:**
   - Spot-still contact sheets for every camera mode.
