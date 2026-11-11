@@ -406,9 +406,13 @@ async function sceneMain(THREE, X) {
   if (FURN.CashRegister_01 && FURN.side_table_01) { const [x, z] = cellXZ(MZ.exit); placeFurn('side_table_01', x + 1.8, z - CS / 2 + 0.9, 0, 0, 0, Math.PI); placeFurn('CashRegister_01', x + 1.8, z - CS / 2 + 0.9, 0, 0, 0, Math.PI, FURN.side_table_01.size.y); }
   // one InstancedMesh per (model, mesh): a few hundred draw calls at most, whatever the room count
   const furnInst = []; let furnCount = 0;
+  // spatial tiles of 3x3 cells so frustum culling (main + shadow pass) rejects whole far tiles
+  const TILE = CS * 3, tileOf = m => { const e = m.elements; return Math.floor(e[12] / TILE) + ',' + Math.floor(e[14] / TILE); };
   for (const [n, F_] of Object.entries(FURN)) { if (!F_.placements.length) continue; furnCount += F_.placements.length;
-    for (const part of F_.parts) { const im = new THREE.InstancedMesh(part.geo, part.mat, F_.placements.length); im.castShadow = !/fluorescent|ceiling_lamp/.test(n); im.receiveShadow = true;
-      F_.placements.forEach((pm, i) => im.setMatrixAt(i, pm.clone().multiply(part.m))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); staticGroup.add(im); furnInst.push(im); } }
+    const byTile = {}; F_.placements.forEach(pm => (byTile[tileOf(pm)] || (byTile[tileOf(pm)] = [])).push(pm));
+    for (const list of Object.values(byTile)) for (const part of F_.parts) { const im = new THREE.InstancedMesh(part.geo, part.mat, list.length); im.castShadow = !/fluorescent|ceiling_lamp|security_camera/.test(n); im.receiveShadow = true;
+      list.forEach((pm, i) => im.setMatrixAt(i, pm.clone().multiply(part.m))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.computeBoundingBox && im.computeBoundingBox(); staticGroup.add(im); furnInst.push(im); } }
+  let furnTris = 0; Object.values(FURN).forEach(F_ => F_.parts.forEach(pp => { const g = pp.geo; furnTris += (g.index ? g.index.count : g.attributes.position.count) / 3 * F_.placements.length; }));
   const furnBase = new Map(); furnMats.forEach(m => { if (m.color) furnBase.set(m, m.color.clone()); });
 
   // ---------------------------------------------------------------- textured props: price tags, clocks, arrows
@@ -1274,7 +1278,7 @@ async function sceneMain(THREE, X) {
   window.exportTelemetry = res => ({ track_name: M.track_name, bpm: M.bpm, resolution_target: res, total_frames_at_30fps: N, telemetry: M.telemetry });
   window.renderFrame = renderFrame;
   window.engineReport = { frames: N, fps: FPS, res: `${W}x${H}`, atlas: !!atlasTex, normal: !!normalTex, seed: SEED, cell_m: +CS.toFixed(3), route_m: +LDOOR.toFixed(1),
-    path_cells: MZ.pathCells.length, furniture_models: Object.keys(FURN).length, furniture_pieces: furnCount, scanned: Object.entries(SCAN).filter(([, v]) => v).map(([k]) => k).join('+'), hero_car: !!window.__heroCar, furn_sample: ['bedroom','living','living2','dining','kitchen','office','library','storage'].map(k => { const t = tags.find(t_ => t_.kind === k && onPath[t_.cell]) || tags.find(t_ => t_.kind === k); return t ? [k, +t.p.x.toFixed(2), +t.p.z.toFixed(2), +t.ry.toFixed(2)] : [k]; }), door_frame: doorFrame, exit_x: +exX.toFixed(2), store_front_z: +(-MAZE_D / 2).toFixed(2), keyframes: F,
+    path_cells: MZ.pathCells.length, furniture_models: Object.keys(FURN).length, furniture_pieces: furnCount, scanned: Object.entries(SCAN).filter(([, v]) => v).map(([k]) => k).join('+'), hero_car: !!window.__heroCar, furn_tris_total: Math.round(furnTris), furn_draws: furnInst.length, furn_sample: ['bedroom','living','living2','dining','kitchen','office','library','storage'].map(k => { const t = tags.find(t_ => t_.kind === k && onPath[t_.cell]) || tags.find(t_ => t_.kind === k); return t ? [k, +t.p.x.toFixed(2), +t.p.z.toFixed(2), +t.ry.toFixed(2)] : [k]; }), door_frame: doorFrame, exit_x: +exX.toFixed(2), store_front_z: +(-MAZE_D / 2).toFixed(2), keyframes: F,
     gpu: (() => { const g = renderer.getContext(); const e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'n/a'; })() };
   await renderFrame(Number(Q.get('f') || 0));
   window.engineReady = true;

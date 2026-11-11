@@ -145,8 +145,10 @@ v9c bent the single push drawing, so its legs could never pass each other. v9d r
 
 - **Furniture:** 36 CC0 Poly Haven models are placed by 8 room kits (bedroom, living, living2, dining, kitchen, office, library, storage), all against walls in the wall-local frame. Each model mesh is one `InstancedMesh`. The current build has 1,377 pieces at a few hundred draw calls whatever the room count. Narrow route cells swap the dining kit for the kitchen kit. If a model is missing, that wall falls back to the procedural box kit.
 - **Scanned surfaces:** the floor uses smooth concrete (3 m repeat), the walls white plaster with dark skirting boards, the ceiling ceiling tiles, and the car park worn asphalt. The procedural canvas surfaces remain as fallback.
+- **Culling:** furniture instances are bucketed into 3×3-cell spatial tiles (1,119 instanced draws, 20.5 M triangles in total), so the main and shadow passes cull far tiles. One whole-maze InstancedMesh per part defeated frustum culling and cost about 8x render time.
 - **Fit-out:** security cameras on every 4th route cell, and a till on a side table at the exit.
 - **Hero car:** Khronos CarConcept (CC-BY 4.0) sits in row 0, bay +3. It's off the lamp line at exX ± 5.2, at native orientation. The emblem is hidden and the plate is swapped. A credit is REQUIRED (see `docs/THIRD_PARTY_ASSETS.md`).
 - **Story hooks:** the Minoan break tints the furniture materials red, and the chorus-snap unfold scales the furniture with the rest of `staticGroup`.
 - **Report fields:** `furniture_models`, `furniture_pieces`, `scanned`, `hero_car`, `furn_sample` (the first room of each kit, for `&cam=` close-ups).
 - **Debug cam:** `EXTRA_Q="&cam=px,py,pz,lx,ly,lz,fov"`. It's overridden visually from frame `halfShelf - 75` (6142) onwards by the camera-attached bag plate.
+- **WARNING, resume cache:** `--strip`, `--range` and `--master` reuse any PNGs already in `renders/<name>_frames/`. After changing the engine or the assets, delete that folder first, or the output silently mixes old and new frames. A run with a stale cache is very fast (about 8 fps instead of about 0.2 fps); that speed is the giveaway.
