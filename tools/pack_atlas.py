@@ -47,37 +47,39 @@ def normal_from_rgba(rgba):
     out[~(a > 0.02)] = (128, 128, 255, 0)
     return out
 
-cells = []
-for name, pre, _, fps, loop, wh in ANIMS:
-    meta = json.load(open(f'sprites/{pre}.json'))
-    strip = Image.open(f'sprites/{pre}_strip.png').convert('RGBA')
-    cw, ch = meta['cell_w'], meta['cell_h']
-    sc = CELL_H / ch
-    for k in range(meta['frames']):
-        c = strip.crop((k * cw, 0, (k + 1) * cw, ch)).resize((max(1, round(cw * sc)), CELL_H), Image.LANCZOS)
-        cells.append((name, k, c, sc, meta, fps, loop, wh))
+if __name__ == '__main__':
+    cells = []
+    for name, pre, _, fps, loop, wh in ANIMS:
+        meta = json.load(open(f'sprites/{pre}.json'))
+        strip = Image.open(f'sprites/{pre}_strip.png').convert('RGBA')
+        cw, ch = meta['cell_w'], meta['cell_h']
+        sc = CELL_H / ch
+        for k in range(meta['frames']):
+            c = strip.crop((k * cw, 0, (k + 1) * cw, ch)).resize((max(1, round(cw * sc)), CELL_H), Image.LANCZOS)
+            cells.append((name, k, c, sc, meta, fps, loop, wh))
 
-# shelf pack, animations kept contiguous
-x = y = 0; row_h = CELL_H; placed = []
-for cell in cells:
-    w = cell[2].width
-    if x + w > MAX_W:
-        x = 0; y += row_h + PAD
-    placed.append((x, y, cell)); x += w + PAD
-H = y + CELL_H
-H2 = 1 << (H - 1).bit_length()
-atlas = Image.new('RGBA', (MAX_W, H2), (0, 0, 0, 0))
-natlas = Image.new('RGBA', (MAX_W, H2), (128, 128, 255, 0))
-amap = {'atlas_w': MAX_W, 'atlas_h': H2, 'cell_h': CELL_H, 'v_flip_note': 'rects are top-left origin pixels; UV v = 1 - (y+h)/atlas_h',
-        'animations': {}}
-for x, y, (name, k, c, sc, meta, fps, loop, wh) in placed:
-    atlas.alpha_composite(c, (x, y))
-    natlas.paste(Image.fromarray(normal_from_rgba(np.asarray(c))), (x, y))
-    a = amap['animations'].setdefault(name, {'frames': [], 'fps': fps, 'loop': loop,
-                                              'world_height_m': wh, 'pose_names': POSE_NAMES.get(name)})
-    a['frames'].append({'rect': [x, y, c.width, CELL_H],
-                        'pivot': [round(meta['pivot_x'] * sc, 1), round(meta['baseline_y'] * sc, 1)]})
-atlas.save('Master_Sprite_Atlas.png', optimize=True)
-natlas.save('Master_Normal_Atlas.png', optimize=True)
-json.dump(amap, open('atlas_map.json', 'w'), indent=1)
-print('atlas', MAX_W, 'x', H2, 'cells', len(cells), 'used height', H)
+    # shelf pack, animations kept contiguous
+    x = y = 0; row_h = CELL_H; placed = []
+    for cell in cells:
+        w = cell[2].width
+        if x + w > MAX_W:
+            x = 0; y += row_h + PAD
+        placed.append((x, y, cell)); x += w + PAD
+    H = y + CELL_H
+    H2 = 1 << (H - 1).bit_length()
+    atlas = Image.new('RGBA', (MAX_W, H2), (0, 0, 0, 0))
+    natlas = Image.new('RGBA', (MAX_W, H2), (128, 128, 255, 0))
+    amap = {'atlas_w': MAX_W, 'atlas_h': H2, 'cell_h': CELL_H, 'v_flip_note': 'rects are top-left origin pixels; UV v = 1 - (y+h)/atlas_h',
+            'animations': {}}
+    for x, y, (name, k, c, sc, meta, fps, loop, wh) in placed:
+        atlas.alpha_composite(c, (x, y))
+        natlas.paste(Image.fromarray(normal_from_rgba(np.asarray(c))), (x, y))
+        a = amap['animations'].setdefault(name, {'frames': [], 'fps': fps, 'loop': loop,
+                                                  'world_height_m': wh, 'pose_names': POSE_NAMES.get(name)})
+        a['frames'].append({'rect': [x, y, c.width, CELL_H],
+                            'pivot': [round(meta['pivot_x'] * sc, 1), round(meta['baseline_y'] * sc, 1)]})
+    atlas.save('Master_Sprite_Atlas.png', optimize=True)
+    natlas.save('Master_Normal_Atlas.png', optimize=True)
+    json.dump(amap, open('atlas_map.json', 'w'), indent=1)
+    print('atlas', MAX_W, 'x', H2, 'cells', len(cells), 'used height', H)
+

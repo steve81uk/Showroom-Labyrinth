@@ -80,3 +80,23 @@ When Wolfgang pushes the trolley side-on, the engine no longer shows a static fr
 - Swing amplitude scales with his actual speed, so standing still holds the drawn pose.
 
 **Applying the changes:** `patch_v9c_skeletal_push.py` is the v9b to v9c change set. After editing joint positions, re-run `python3 tools/rig_build.py --preview` from the folder holding the atlases.
+
+## v9d: cutout rig, real alternating walk (supersedes v9c)
+
+v9c bent the single push drawing, so its legs could never pass each other. v9d replaces it with a proper cutout puppet: three skinned meshes driven by one skeleton.
+
+**Pieces** (built by `tools/rig_build2.py` and packed into free atlas space at y ≥ 2600):
+- **`push_body`**: the push drawing with trousers and boots erased. It keeps the torso, coat, arms, tail and trolley. Bones: root, trolley, hip, legs, spine, chest, head, coat, tail0 to tail2.
+- **`leg`**: one complete leg (95x265 px) cut from `walk_side[0]`, the straight planted leg. The thigh is hidden under the coat in every pose, so the trouser fabric is extended upward to the hip to give the joint room to rotate. Bones: hip, knee, ankle.
+- **Near and far legs**: the same leg mesh used twice, parented to the body's `legs` bone and layered behind the coat. The far leg is tinted to 54% for depth.
+
+**Gait** (one step per 2 beats, footfalls on beats 1 and 3):
+- Thighs swing ±27° about a slight backward lean, in true antiphase, so left and right alternate and cross.
+- Knee flex (0.8 rad) peaks early in the swing to lift the foot, then extends to reach for the next contact.
+- The trailing heel peels before lift-off, and the feet otherwise stay flat.
+- Ground solve: the lowest sole sits on the floor. The legs' attach point takes 45% of the height change and the body 55%, which gives the bob.
+- The stride scales with real speed (from `S[f]`), so standing still settles back to a neutral stance.
+
+**Check images:** `docs/rig2_cutout_pieces.png` and `docs/walk_rig_v2_strip.jpg`.
+
+**The atlases changed.** Use the new `Master_Sprite_Atlas.png` (sha256 `6343a37e…cbf`) and `Master_Normal_Atlas.png` (`ce00573d…072`) with this `atlas_map.json` (`20c255f3…bf`). The v1 atlases lack the `push_body` and `leg` cells, so on those the engine falls back to the static push frame.

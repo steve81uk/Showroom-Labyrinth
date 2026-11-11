@@ -35,11 +35,11 @@ This section was added after inspecting real files. It does not change the shot 
 
 - **Audio:** `audio_master.wav` is the Suno WAV download (clip bff0ed1e). It is 48 kHz s16 stereo, 213.2 s, -15.9 LUFS integrated and -4.0 dBTP true peak. sha256 `eef852af2cc3e2c1cb888f27a2a399442e5791846412916daaec9857baf5b5c0`.
 - **BPM:** settled at 178.9, measured from the audio. The Suno beat grid gives 178.9 and librosa (hop 480) agrees, so 176 was the brief's value, not the track's. The engine times everything from `acoustic.beats_s` in `assets/manifest.json`, never from a BPM constant.
-- **Atlases:** `Master_Sprite_Atlas.png` (sha256 `dacca91b…6c47eb`) and `Master_Normal_Atlas.png` (sha256 `72ae296e…de52d`). Both are 4096x4096 with 41 cells. They stay out of git per `.gitignore` and are in `Bureau_Asset_Pack_v1_2026-11-11.zip`.
-- **atlas_map.json:** now also carries `rigs.push`, the skeletal rig: 16 bones, 4,746 vertices, 8,866 triangles.
+- **Atlases (v2, current):** `Master_Sprite_Atlas.png` (sha256 `6343a37ee8f7a361…cbf`) and `Master_Normal_Atlas.png` (sha256 `ce00573d92106c07…072`). Both are 4096x4096: the 41 original cells plus the `push_body` and `leg` cutout cells. The v1 atlases (`dacca91b…`, `72ae296e…`) are superseded. They stay out of git per `.gitignore` and are in `Bureau_Asset_Pack_v1_2026-11-11.zip`.
+- **atlas_map.json:** carries `rigs.push_body` (body, 11 bones) and `rigs.leg` (3 bones, used twice). Together they make the v9d cutout walk. The v9c single-mesh `rigs.push` is removed.
 - **Rendered and checked:**
   - Spot-still contact sheets for every camera mode.
   - The 300-frame test strip (frames 1908 to 2208), 1920x1080 at 30 fps, BT.709, AAC 320k, .mkv. Decoded clean.
-  - A 90-frame push-rig motion test (frames 1680 to 1770).
+  - 90-frame push-rig motion tests (frames 1680 to 1770) for v9c and v9d.
 - **Not done yet:** test-strip approval, the full master, social exports. Lyric timing comes from Suno's word alignment and hasn't been checked by hand.
 - **Two engines:** `engine/main.js` and its modules are the procedural placeholder preview. `engine/labyrinth_renderer.js` is the production renderer: deterministic, atlas-driven, and the one that produced every file above.

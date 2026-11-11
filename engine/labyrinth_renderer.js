@@ -415,70 +415,66 @@ async function sceneMain(THREE, X) {
   const wolf = new TextureAnimator(1.95, 'wolf'); scene.add(wolf.root);
   const mino = new TextureAnimator(1.7, 'mino'); scene.add(mino.root);
 
-  // ---------------------------------------------------------------- SKELETAL RIG: 2D drawing, 3D-style bone animation (SkinnedMesh)
-  class SpriteRig {
-    constructor(rig) {
-      const an = AM.animations[rig.anim], fr = an.frames[rig.frame], [ax, ay] = fr.rect, [pvx, pvy] = rig.pivot;
-      this.rig = rig; this.s = (an.world_height_m || 1.95) / AM.cell_h;
-      const nV = rig.vertices.length, pos = new Float32Array(nV * 3), uv = new Float32Array(nV * 2), si = new Uint16Array(nV * 4), sw = new Float32Array(nV * 4);
-      rig.vertices.forEach(([x, y, z], i) => { pos.set([x - pvx, pvy - y, z * 1.6], i * 3); uv.set([(ax + x) / AM.atlas_w, 1 - (ay + y) / AM.atlas_h], i * 2);
-        si.set(rig.skinIndex[i], i * 4); sw.set(rig.skinWeight[i], i * 4); });
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4)); g.setIndex(rig.index); g.computeVertexNormals();
-      this.mat = new THREE.MeshStandardMaterial({ map: atlasTex, normalMap: normalTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.82 });
-      // bones: rest pose = the drawing. Positions are relative to the parent, in pixels, y up.
-      this.B = {}; const P = {}; rig.bones.forEach(([n, par, x, y]) => { P[n] = [x, y]; });
-      rig.bones.forEach(([n, par, x, y]) => { const b = new THREE.Bone(); b.name = n; const [px, py] = par ? P[par] : [pvx, pvy];
-        b.position.set(x - px, -(y - py), 0); this.B[n] = b; if (par) this.B[par].add(b); });
-      this.rest = {}; for (const n in this.B) this.rest[n] = this.B[n].position.clone();
-      this.mesh = new THREE.SkinnedMesh(g, this.mat); this.mesh.frustumCulled = false; this.mesh.castShadow = true;
-      this.mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: atlasTex, alphaTest: 0.5, side: THREE.DoubleSide });
-      this.mesh.add(this.B.root); this.mesh.bind(new THREE.Skeleton(rig.bones.map(b => this.B[b[0]])));
-      this.mesh.scale.setScalar(this.s); this.root = new THREE.Group(); this.root.add(this.mesh); this.root.visible = false;
-      // leg geometry (px, y down) for FK ground solve
-      this.J = P; const ang = (a, b) => Math.atan2(P[b][0] - P[a][0], P[b][1] - P[a][1]);   // forward-from-vertical
-      this.restLeg = { B: ang('thighB', 'footB'), F: ang('thighF', 'footF') };
-      this.restThigh = { B: ang('thighB', 'shinB'), F: ang('thighF', 'shinF') }; this.restShin = { B: ang('shinB', 'footB'), F: ang('shinF', 'footF') };
-      this.len = { B: [Math.hypot(P.shinB[0] - P.thighB[0], P.shinB[1] - P.thighB[1]), Math.hypot(P.footB[0] - P.shinB[0], P.footB[1] - P.shinB[1])],
-                   F: [Math.hypot(P.shinF[0] - P.thighF[0], P.shinF[1] - P.thighF[1]), Math.hypot(P.footF[0] - P.shinF[0], P.footF[1] - P.shinF[1])] };
-      this.groundY = Math.max(P.footB[1], P.footF[1]);
-    }
-    // phase: 0..1 per 2-step cycle (one step per 2 beats); amp 0..1 (0 = standing in the drawn pose)
-    pose(phase, amp, f) {
-      const B = this.B, TAU = Math.PI * 2, ph = phase * TAU, d2r = Math.PI / 180;
-      for (const n in B) { B[n].rotation.set(0, 0, 0); B[n].position.copy(this.rest[n]); }
-      // leaning trudge: each leg swings about its own drawn angle, in antiphase (legs never cross under the coat)
-      const A = 16 * d2r * amp, K = 0.55 * amp;
-      const legTarget = { B: this.restLeg.B - A * Math.cos(ph), F: this.restLeg.F + A * Math.cos(ph) };
-      const flex = { B: K * Math.max(0, Math.sin(ph)) + 0.08 * amp, F: K * Math.max(0, -Math.sin(ph)) + 0.08 * amp };
-      const ank = {};
-      for (const L of ['B', 'F']) {
-        const lt = lerp(this.restLeg[L], legTarget[L], amp);
-        // thigh rotation so the whole leg points at the target; shin bends back by the flex
-        const dThigh = lt - this.restLeg[L] + flex[L] * 0.45, dShin = -flex[L];
-        B['thigh' + L].rotation.z = dThigh; B['shin' + L].rotation.z = dShin;
-        // toe-off: trailing leg late in stance lifts the heel
-        const toe = L === 'B' ? Math.max(0, -Math.sin(ph - 0.6)) : Math.max(0, Math.sin(ph - 0.6));
-        B['foot' + L].rotation.z = -(dThigh + dShin) + 0.25 * amp * toe * (L === 'B' ? 1 : -1) * 0;
-        // 2D FK (px, y down) to find the ankle height
-        const a1 = this.restThigh[L] + dThigh, a2 = this.restShin[L] + dThigh + dShin, [l1, l2] = this.len[L];
-        ank[L] = this.J['thigh' + L][1] + l1 * Math.cos(a1) + l2 * Math.cos(a2);
-      }
-      // keep the lowest ankle on the floor: hip drops at each contact (natural gait bounce)
-      const drop = this.groundY - Math.max(ank.B, ank.F);
-      B.hip.position.y = this.rest.hip.y - drop;
-      // hands stay on the handle: the trolley bone follows the hip's height change only partly (wrist give)
-      B.trolley.position.y = this.rest.trolley.y - drop * 0.15 + (f % 4 < 2 ? 0.4 : 0) * env('hats', f);
-      // secondary motion
-      B.spine.position.y = this.rest.spine.y + Math.cos(ph * 2) * 1.5 * amp;
-      B.spine.rotation.z = -0.025 * amp * Math.cos(ph * 2); B.head.rotation.z = 0.035 * amp * Math.sin(ph * 2 + 0.6);
-      B.coat.rotation.z = 0.03 * amp * Math.sin(ph * 2 - 0.4);
-      B.tail0.rotation.z = 0.10 * Math.sin(ph * 2 - 0.5) * (0.4 + amp); B.tail1.rotation.z = 0.16 * Math.sin(ph * 2 - 1.1) * (0.4 + amp); B.tail2.rotation.z = 0.22 * Math.sin(ph * 2 - 1.7) * (0.4 + amp);
-      this.mesh.updateMatrixWorld(true);
-      return { drop };
-    }
+  // ---------------------------------------------------------------- SKELETAL CUTOUT RIG: 2D drawing, bone-driven walk (SkinnedMesh x3)
+  // body = push frame with legs erased; legs = one fully drawn leg (from walk_side[0]) used twice, near and far
+  function buildSkin(rig, mat, zOff) {
+    const an = AM.animations[rig.anim], fr = an.frames[rig.frame], [ax, ay] = fr.rect, [pvx, pvy] = rig.pivot;
+    const nV = rig.vertices.length, pos = new Float32Array(nV * 3), uv = new Float32Array(nV * 2), si = new Uint16Array(nV * 4), sw = new Float32Array(nV * 4);
+    rig.vertices.forEach(([x, y], i) => { pos.set([x - pvx, pvy - y, zOff], i * 3); uv.set([(ax + x) / AM.atlas_w, 1 - (ay + y) / AM.atlas_h], i * 2); si.set(rig.skinIndex[i], i * 4); sw.set(rig.skinWeight[i], i * 4); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4)); g.setIndex(rig.index); g.computeVertexNormals();
+    const B = {}, P = {}; rig.bones.forEach(([n, , x, y]) => { P[n] = [x, y]; });
+    rig.bones.forEach(([n, par, x, y]) => { const b = new THREE.Bone(); b.name = n; const [px, py] = par ? P[par] : [pvx, pvy]; b.position.set(x - px, -(y - py), 0); B[n] = b; if (par) B[par].add(b); });
+    const mesh = new THREE.SkinnedMesh(g, mat); mesh.frustumCulled = false; mesh.castShadow = true;
+    mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: atlasTex, alphaTest: 0.5, side: THREE.DoubleSide });
+    const rootBone = B[rig.bones[0][0]]; mesh.add(rootBone); mesh.bind(new THREE.Skeleton(rig.bones.map(b => B[b[0]])));
+    const rest = {}; for (const n in B) rest[n] = B[n].position.clone();
+    return { mesh, B, rest, P };
   }
-  const pushRig = AM.rigs && AM.rigs.push ? new SpriteRig(AM.rigs.push) : null;
+  class CutoutPush {
+    constructor(bodyRig, legRig) {
+      const mk = c => new THREE.MeshStandardMaterial({ map: atlasTex, normalMap: normalTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.82, color: c });
+      this.mats = [mk(0xffffff), mk(0xffffff), mk(0x8a8a90)];
+      this.body = buildSkin(bodyRig, this.mats[0], 0);
+      this.legs = { near: buildSkin(legRig, this.mats[1], -1.5), far: buildSkin(legRig, this.mats[2], -3.0) };
+      const at = bodyRig.leg_attach, hipY = bodyRig.bones.find(b => b[0] === 'legs')[3], hipX = bodyRig.bones.find(b => b[0] === 'legs')[2];
+      for (const k of ['near', 'far']) { const L = this.legs[k]; this.body.B.legs.add(L.mesh); L.mesh.position.set(at[k][0] - hipX, 0, 0); L.mesh.scale.setScalar(legRig.scale_to_push || 1); }
+      const J = legRig.joints; this.l1 = J.knee[1] - J.hip[1]; this.l2 = J.ankle[1] - J.knee[1]; this.soleD = J.sole - J.ankle[1];
+      this.hipY0 = hipY; this.groundY = bodyRig.pivot[1];
+      this.s = (AM.animations[bodyRig.anim].world_height_m || 1.95) / AM.cell_h;
+      this.root = new THREE.Group(); this.root.add(this.body.mesh); this.body.mesh.scale.setScalar(this.s); this.root.visible = false;
+    }
+    // phase 0..1 per two-step cycle; amp 0..1 scales the stride with actual speed
+    pose(phase, amp, f) {
+      const d2r = Math.PI / 180, ph = phase * Math.PI * 2, bd = this.body, B = bd.B;
+      for (const n in B) { B[n].rotation.set(0, 0, 0); B[n].position.copy(bd.rest[n]); }
+      const th0 = -7 * d2r * amp - 3 * d2r, A = 27 * d2r * amp, K = 0.8 * amp;
+      let depth = 0;
+      for (const [k, o] of [['near', 0], ['far', Math.PI]]) {
+        const L = this.legs[k], LB = L.B; for (const n in LB) { LB[n].rotation.set(0, 0, 0); LB[n].position.copy(L.rest[n]); }
+        // swing = the half-cycle where the thigh moves forward (sin q < 0). Knee flex peaks early in the swing (lift),
+        // then extends to reach for the next contact; stance keeps a slight bend.
+        const q = ph + o, th = th0 + A * Math.cos(q), sw = Math.max(0, -Math.sin(q)), early = Math.max(0, Math.cos(q)) > 0 ? 1 : 0.55;
+        const flex = K * Math.pow(sw, 1.4) * early + 0.06 * amp;
+        // heel peel just before the swing: trailing foot rolls onto its toe
+        const peel = 0.35 * amp * Math.max(0, Math.sin(q - Math.PI * 0.5)) * (Math.cos(q) < 0 ? 1 : 0);
+        LB.hip.rotation.z = th; LB.knee.rotation.z = -flex; LB.ankle.rotation.z = flex - th + peel;
+        depth = Math.max(depth, this.l1 * Math.cos(th) + this.l2 * Math.cos(th - flex) + this.soleD * Math.cos(peel) - 4 * Math.sin(peel));
+      }
+      // ground solve: the lowest sole touches the floor; the leg attach point rides up and down, the body follows at 55%
+      const attachY = this.groundY - depth * (this.legs.near.mesh.scale.x);
+      const rel = attachY - this.hipY0;
+      B.legs.position.y = bd.rest.legs.y - rel * 0.45;
+      B.hip.position.y = bd.rest.hip.y - rel * 0.55;
+      B.trolley.position.y = bd.rest.trolley.y + (f % 4 < 2 ? 0.4 : 0) * env('hats', f);
+      B.spine.rotation.z = -0.03 * amp * Math.cos(ph * 2); B.head.rotation.z = 0.04 * amp * Math.sin(ph * 2 + 0.6);
+      B.coat.rotation.z = 0.035 * amp * Math.sin(ph * 2 - 0.4);
+      B.tail0.rotation.z = 0.10 * Math.sin(ph * 2 - 0.5) * (0.4 + amp); B.tail1.rotation.z = 0.16 * Math.sin(ph * 2 - 1.1) * (0.4 + amp); B.tail2.rotation.z = 0.22 * Math.sin(ph * 2 - 1.7) * (0.4 + amp);
+      this.root.updateMatrixWorld(true);
+    }
+    set mirror(m) { this.root.scale.set(m ? -1 : 1, 1, 1); this.mats.forEach(x => x.normalScale.set(m ? -1 : 1, 1)); }
+  }
+  const pushRig = AM.rigs && AM.rigs.push_body && AM.rigs.leg ? new CutoutPush(AM.rigs.push_body, AM.rigs.leg) : null;
   if (pushRig) scene.add(pushRig.root);
   // contact blob under feet (keeps him grounded in map / top shots where the cast shadow is thin)
   const blobTex = canvasTex(128, 128, (c) => { const g = c.createRadialGradient(64, 64, 4, 64, 64, 62); g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, 128, 128); });
@@ -883,7 +879,7 @@ async function sceneMain(THREE, X) {
         const amp = clamp(sp / 1.2, 0, 1);       // standing still holds the drawn pose
         pushRig.pose((((beatPos[f] / 4) % 1) + 1) % 1, amp, f);
         pushRig.root.position.copy(wolf.root.position).setY(0); pushRig.root.quaternion.copy(wolf.root.quaternion);
-        pushRig.root.scale.set(mirror ? -1 : 1, 1, 1); pushRig.mat.normalScale.set(mirror ? -1 : 1, 1);
+        pushRig.mirror = mirror;
         wolf.root.visible = false; } }
     blob.position.set(P.x, 0.02, P.z); blob.visible = wolf.root.visible;
     // trolley ahead of him
