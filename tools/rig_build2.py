@@ -90,9 +90,10 @@ def finish(gx, gy, Wt, tris, names, bones, extra):
 
 # body bones (no legs); 'legs' is the attach point for both leg meshes (moves with the walk bob)
 BB = [['root', None, 331.5, 500.8], ['trolley', 'root', 420, 250], ['hip', 'root', 258, 318], ['legs', 'hip', 258, 318], ['spine', 'hip', 262, 250], ['chest', 'spine', 300, 175],
-      ['head', 'chest', 330, 95], ['coat', 'hip', 220, 330], ['tail0', 'hip', 125, 300], ['tail1', 'tail0', 85, 262], ['tail2', 'tail1', 55, 228]]
+      ['head', 'chest', 330, 95], ['coat', 'hip', 220, 330], ['tail0', 'hip', 125, 300], ['tail1', 'tail0', 85, 262], ['tail2', 'tail1', 55, 228],
+      ['jaw', 'head', 345, 118], ['eye', 'head', 357, 95], ['earB', 'head', 332, 62], ['earF', 'head', 366, 66]]
 names = [b[0] for b in BB]; ix = {n: i for i, n in enumerate(names)}
-gx, gy, tris = grid_mesh(body, 6)
+gx, gy, tris = grid_mesh(body, 4)
 Wt = np.zeros(gx.shape + (len(names),))
 t = np.clip((318 - gy) / 240, 0, 1)
 parts = {'hip': np.clip(1 - t * 3, 0, 1), 'spine': np.clip(1 - abs(t - 0.33) * 3, 0, 1), 'chest': np.clip(1 - abs(t - 0.66) * 3, 0, 1), 'head': np.clip((t - 0.66) * 3, 0, 1)}
@@ -110,7 +111,23 @@ for k, n in enumerate(['tail0', 'tail1', 'tail2']): Wt[..., ix[n]] = np.where(tz
 tro = gx >= 408; hands = (gx >= 330) & (gx < 408) & (gy > 215) & (gy < 285); hb = np.clip((gx - 330) / 78, 0, 1) * 0.75
 for j in range(len(names)): Wt[..., j] = np.where(tro, 0, np.where(hands, Wt[..., j] * (1 - hb), Wt[..., j]))
 Wt[..., ix['trolley']] = np.where(tro, 1.0, np.where(hands, Wt[..., ix['trolley']] + hb, Wt[..., ix['trolley']]))
-AM.setdefault('rigs', {})['push_body'] = finish(gx, gy, Wt, tris, names, BB, {'anim': 'push_body', 'frame': 0, 'cell': [W, H], 'pivot': bfr['pivot'], 'leg_attach': {'near': [266, 318], 'far': [250, 318]}})
+# face: jaw below the mouth line, eye squash for blinks, two ears
+def take(mask, bone, w):
+    for j in range(len(names)): Wt[..., j] = np.where(mask, Wt[..., j] * (1 - w), Wt[..., j])
+    Wt[..., ix[bone]] = np.where(mask, Wt[..., ix[bone]] + w, Wt[..., ix[bone]])
+mouthY = 116.5 + (gx - 345) * 0.16
+take((gx >= 341) & (gx <= 404) & (gy > mouthY) & (gy < 146), 'jaw', np.clip((gx - 341) / 10, 0, 1) * np.clip((146 - gy) / 6, 0, 1))
+de = np.hypot(gx - 357, gy - 95); take(de < 10, 'eye', np.clip(1 - de / 10, 0, 1))
+take((gx < 351) & (gx > 312) & (gy < 62), 'earB', np.clip((62 - gy) / 12, 0, 1))
+take((gx >= 351) & (gx < 382) & (gy < 68), 'earF', np.clip((68 - gy) / 12, 0, 1))
+# slit the mesh along the lip line so the jaw parts from the upper muzzle (reveals the mouth interior)
+jw = Wt[..., ix['jaw']].reshape(-1); fx, fy = gx.reshape(-1), gy.reshape(-1); kept = []
+for t in range(0, len(tris), 3):
+    v = tris[t:t + 3]; js = jw[v]
+    if js.max() - js.min() > 0.45 and 347 < fx[v].mean() < 402 and 108 < fy[v].mean() < 136: continue
+    kept += v
+print('mouth slit removed', (len(tris) - len(kept)) // 3, 'triangles'); tris = kept
+AM.setdefault('rigs', {})['push_body'] = finish(gx, gy, Wt, tris, names, BB, {'anim': 'push_body', 'frame': 0, 'cell': [W, H], 'pivot': bfr['pivot'], 'leg_attach': {'near': [266, 318], 'far': [250, 318]}, 'mouth': [[345, 117], [396, 122], [390, 131], [352, 129]]})
 
 LB = [['hip', None, *LEGJ['hip']], ['knee', 'hip', *LEGJ['knee']], ['ankle', 'knee', *LEGJ['ankle']]]
 gx, gy, tris = grid_mesh(leg, 5)

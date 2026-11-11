@@ -100,3 +100,26 @@ v9c bent the single push drawing, so its legs could never pass each other. v9d r
 **Check images:** `docs/rig2_cutout_pieces.png` and `docs/walk_rig_v2_strip.jpg`.
 
 **The atlases changed.** Use the new `Master_Sprite_Atlas.png` (sha256 `6343a37e…cbf`) and `Master_Normal_Atlas.png` (`ce00573d…072`) with this `atlas_map.json` (`20c255f3…bf`). The v1 atlases lack the `push_body` and `leg` cells, so on those the engine falls back to the static push frame.
+
+## v9e: face, fluid motion, car park
+
+**Face** (on the cutout push body):
+- **Bones:** four new bones (`jaw`, `eye`, `earB`, `earF`), and the body mesh is now 4 px (9,419 vertices).
+- **Lip-sync:** the jaw follows the Suno word timings. Each word opens and closes once per estimated syllable (counted from vowel groups), scaled by vocal energy, with a fast attack and a 0.55 release per frame. Maximum jaw drop is 0.5 rad.
+- **Mouth:** the mesh is slit along the lip line (31 triangles removed), so the jaw parts from the upper muzzle and shows a dark mouth interior with a tongue. When closed, the slit sits on the drawn mouth line.
+- **Blinks** every 2.5 to 5.5 s on a deterministic schedule.
+- **Ears:** they flick on the hi-hats and perk up on the kicks. The head tips back slightly with each open vowel.
+
+**Motion:**
+- **Camera motion blur:** a pass that blurs along the camera's movement and outward from the centre when it pushes forward (9 samples). It switches off on cuts.
+- **Particles:** dust motes drifting in the light indoors, and steam plumes from MINO's exhaust that puff on the kicks.
+- **Wheels:** the 3D trolley wheels spin with distance travelled.
+
+**Car park (rebuilt):**
+- PBR asphalt with fine aggregate, cracks, a few oil stains and one glossy puddle per 7 m tile.
+- Four car body types (hatch, saloon, SUV, van), built from extruded rounded side profiles. Clear-coat paint, dark glass, door pillars, wheels with five-spoke rims, head and tail lights, UK plates (white front, yellow rear), mirrors and contact shadows.
+- Painted bays in four rows, tree-lined kerb islands, lamp posts, a trolley shelter with nested trolleys, the DAEDALUS sign with shop-front glazing, a zebra walkway and a cloud-gradient sky.
+- A brighter low sun outside.
+- Moving extras: a runaway trolley rolling across the lot, and a car reversing out of its bay with reverse lights on.
+
+**Debug flags** (set via `EXTRA_Q`): `&mouth=1` forces the mouth open, `&mouth=0` forces it closed.
