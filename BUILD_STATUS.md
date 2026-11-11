@@ -43,3 +43,11 @@ This section was added after inspecting real files. It does not change the shot 
   - 90-frame push-rig motion tests (frames 1680 to 1770) for v9c and v9d.
 - **Not done yet:** test-strip approval, the full master, social exports. Lyric timing comes from Suno's word alignment and hasn't been checked by hand.
 - **Two engines:** `engine/main.js` and its modules are the procedural placeholder preview. `engine/labyrinth_renderer.js` is the production renderer: deterministic, atlas-driven, and the one that produced every file above.
+
+## 2026-11-11: engine v9g, real store
+
+- 36 CC0 furniture models (1,452 pieces), instanced in 3×3-cell tiles. Scanned floor, wall, ceiling and asphalt. CC-BY hero car.
+- Test strip re-rendered at 1080p (frames 1908 to 2208), sent for approval. Contact sheet: `docs/strip_v9g_contact.jpg`.
+- Asset pack v4: `Bureau_Asset_Pack_v4_2026-11-11.zip` (sha256 `0c2a5945…`), 122 MB.
+- Before release: verify the CarConcept credit and check that the star wheel centres are not a Khronos mark.
+- Master not started; it waits on strip approval.
