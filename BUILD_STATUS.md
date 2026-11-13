@@ -51,3 +51,12 @@ This section was added after inspecting real files. It does not change the shot 
 - Asset pack v4: `Bureau_Asset_Pack_v4_2026-11-11.zip` (sha256 `0c2a5945…`), 122 MB.
 - Before release: verify the CarConcept credit and check that the star wheel centres are not a Khronos mark.
 - Master not started; it waits on strip approval.
+
+## 2026-11-13: master delivered
+
+- Master: 6,396 frames, 213.2 s, 1920x1080, 30 fps, BT.709, contact shadows (AO) on. Rendered in the sandbox (no GPU) in 400-frame chunks over about 34 hours.
+- Audio: -16.0 LUFS integrated, -4.1 dBTP true peak (matches the source WAV), AAC 320k.
+- Delivery: `The_Showroom_Labyrinth_YouTube_1080p.mp4` (CRF 19, maxrate 8M, faststart, 217 MB). The full master `.mkv` (2.2 GB) stays in the sandbox.
+- Unattended chain: `run_master_block.sh` (retries crashed chunks), `watch_block.sh` (returns as soon as the runner dies), with a scheduled follow-up message every 2 hours.
+- Review flags: FPV shots at about 0:13 and 3:20 pass very close to furniture (a bed post fills part of the frame).
+- Not uploaded or scheduled anywhere. Still required before release: the CarConcept CC-BY credit line, and a check that the hero car's star wheel centres are not a logo.
