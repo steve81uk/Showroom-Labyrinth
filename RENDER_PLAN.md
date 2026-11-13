@@ -18,3 +18,9 @@ All ranges: startFrame inclusive, endFrame exclusive. fps 30. Timeline offset 0,
 
 ## Not yet assumed
 No full-song time estimate is claimed until stage 5 benchmarks the heavy shots at final resolution.
+
+## v10e update (2026-11-13 evening)
+- Stage 3 re-run with the real character: strip [3650, 3950) 1280x720 DEBUG, 2 workers, 124 s wall, peak RSS 1.23 GB, validation PASS (world, map, MINO behaviour). Door wait visible at 3811-3843.
+- Stage 5 (partial) 1920x1080 native 30, 100 frames each: map check-in 3 with glitch; MINO chase in wardrobes; dense core (m3); check-in 5 map to rise. 1.17-1.28 fps on 2 workers for character shots (map-only shot measured 0.53 fps including page start-up, to be re-measured), about 5 s encode per 100 frames, about 3.5 MB PNG per frame.
+- Projection at native 30, 2 workers: 6396 frames / about 1.2 fps = about 90 min render plus about 5 min encode, before retries. Chunked: 400-frame chunks (about 1.4 GB PNG each), encode, delete frames, next chunk; or stream with --pipe (1 worker, about half the speed, no frame disk).
+- Native 60: not available (30 Hz timeline). Would double frames (about 3 h at the same per-frame cost) after a 60 Hz rebuild.

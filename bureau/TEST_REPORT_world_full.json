@@ -108,20 +108,28 @@
      "closed"
     ],
     [
-     3782,
+     3817,
      "opening"
     ],
     [
-     3792,
+     3827,
      "open"
     ],
     [
-     3966,
+     4193,
      "closing"
     ],
     [
-     3976,
+     4203,
      "closed"
+    ],
+    [
+     6385,
+     "opening"
+    ],
+    [
+     6395,
+     "open"
     ]
    ]
   },
@@ -197,11 +205,27 @@
      "open"
     ],
     [
-     4296,
+     4757,
      "closing"
     ],
     [
-     4306,
+     4767,
+     "closed"
+    ],
+    [
+     5145,
+     "opening"
+    ],
+    [
+     5155,
+     "open"
+    ],
+    [
+     5452,
+     "closing"
+    ],
+    [
+     5462,
      "closed"
     ]
    ]
@@ -216,35 +240,35 @@
      "closed"
     ],
     [
-     4030,
+     4310,
      "opening"
     ],
     [
-     4040,
+     4320,
      "open"
     ],
     [
-     4088,
+     4420,
      "closing"
     ],
     [
-     4098,
+     4430,
      "closed"
     ],
     [
-     4840,
+     5886,
      "opening"
     ],
     [
-     4850,
+     5896,
      "open"
     ],
     [
-     4971,
+     6128,
      "closing"
     ],
     [
-     4981,
+     6138,
      "closed"
     ]
    ]
@@ -311,12 +335,12 @@
   {
    "door": "ward_serv",
    "kind": "swing",
-   "crossing_frame": 3862,
-   "opening_starts": 3782,
-   "fully_open": 3792,
-   "open_lead_frames": 70,
-   "min_speed_mps_while_opening": 1.7,
-   "waited": false
+   "crossing_frame": 3870,
+   "opening_starts": 3817,
+   "fully_open": 3827,
+   "open_lead_frames": 43,
+   "min_speed_mps_while_opening": 0,
+   "waited": true
   },
   {
    "door": "kit_hall",
@@ -350,9 +374,43 @@
   }
  ],
  "mino_line_of_sight": {
-  "frames_clear": 2558,
-  "frames_blocked": 678
+  "frames_clear": 540,
+  "frames_blocked": 2696
  },
+ "mino_behaviour": {
+  "frames_by_state": {
+   "emerge": 64,
+   "chase": 471,
+   "lost": 167,
+   "search": 239,
+   "patrol": 1340,
+   "track": 955
+  },
+  "violations": {
+   "chase_without_recent_los": [],
+   "lost_search_beyond_last_seen": [],
+   "last_seen_updated_without_los": [],
+   "speed_over_3mps": []
+  },
+  "pass": true
+ },
+ "holds": [
+  {
+   "door": "ward_serv",
+   "s_door": 210.76,
+   "s_stop": 208.76,
+   "window": [
+    3722,
+    3933
+   ],
+   "stop": [
+    3811,
+    3843
+   ],
+   "notice": 6,
+   "vmax_window_mps": 4.6
+  }
+ ],
  "map_correspondence": null,
  "pass": true
 }

@@ -218,6 +218,16 @@ for (const sc of CUSPS) { let fc = 0; while (fc < N - 1 && S[fc] < sc) fc++; con
   const h0 = (fb - fa - PIVOT_F) / 2, ss = t => t * t * (3 - 2 * t);
   for (let f = fa; f <= fb; f++) { const k = f - fa; let g; if (k < h0) g = hold * ss(k / h0); else if (k < h0 + PIVOT_F) g = hold; else g = hold + (1 - hold) * ss((k - h0 - PIVOT_F) / h0); S[f] = sa + (sb - sa) * g; }
   PIVOTS.push({ s: sc, f0: fa + Math.round(h0), f1: fa + Math.round(h0) + PIVOT_F }); }
+// ---------------------------------------------------------------- v10e authored holds (O1): stop outside a door's leaf sweep, wait while it opens, then go.
+// Local retime only: S is identical outside [f0 - WIN, f1 + WIN], so the recording and every later cue are untouched.
+const HOLDS = [{ door: 'ward_serv', stopBefore: 2.0, hold: 32, win: 105, notice: 6 }], HOLDINFO = [];
+for (const H of HOLDS) { const d = DOORS.find(x => x.id === H.door); let sd = 0, best = 1e9;
+  for (let k = 0; k < SL.length; k++) { const dd = Math.hypot(ROUTE[k][0] - d.x, ROUTE[k][1] - d.z); if (dd < best) { best = dd; sd = SL[k]; } }
+  const sc = sd - H.stopBefore; let fc = 0; while (fc < N - 1 && S[fc] < sc) fc++;
+  const fa = Math.max(0, fc - H.win), fb = Math.min(N - 1, fc + H.win), sa = S[fa], sb = S[fb], hold = (sc - sa) / Math.max(1e-9, sb - sa), h0 = (fb - fa - H.hold) / 2, ss = t => t * t * (3 - 2 * t);
+  for (let f = fa; f <= fb; f++) { const k = f - fa; let g; if (k < h0) g = hold * ss(k / h0); else if (k < h0 + H.hold) g = hold; else g = hold + (1 - hold) * ss((k - h0 - H.hold) / h0); S[f] = sa + (sb - sa) * g; }
+  let vmax = 0; for (let f = fa + 1; f <= fb; f++) vmax = Math.max(vmax, (S[f] - S[f - 1]) * FPS);
+  HOLDINFO.push({ door: H.door, s_door: +sd.toFixed(2), s_stop: +sc.toFixed(2), window: [fa, fb + 1], stop: [fa + Math.round(h0), fa + Math.round(h0) + H.hold], notice: H.notice, vmax_window_mps: +vmax.toFixed(2) }); }
 // per-frame heading: one-sided tangent near cusps (never across a reversal), rotate in place during a pivot
 const tanOneSided = s => { for (const sc of CUSPS) { if (Math.abs(s - sc) < 1.0) { const d = s <= sc ? -1 : 1; const a = posAtS(d < 0 ? s - 0.5 : s), b = posAtS(d < 0 ? s : s + 0.5); const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   if (d < 0 && s >= sc - 1e-6) { const a2 = posAtS(sc - 0.5), b2 = posAtS(sc); const l2 = Math.hypot(b2[0] - a2[0], b2[1] - a2[1]) || 1; return [(b2[0] - a2[0]) / l2, (b2[1] - a2[1]) / l2]; }
@@ -228,26 +238,63 @@ const YAW = new Float64Array(N); { let last = 0; for (let f = 0; f < N; f++) { c
   else if (f > 0 && Math.abs(S[f] - S[f - 1]) < 1e-6) YAW[f] = last; else { const t = tanOneSided(S[f]); YAW[f] = Math.atan2(t[0], t[1]); } last = YAW[f]; } }
 
 // ---------------------------------------------------------------- MINO-7000: hidden in its closet until reveal, then follows the customer's route
-const SM = new Float64Array(N), minoOn = new Uint8Array(N);
+const SM = new Float64Array(N), minoOn = new Uint8Array(N), MST = new Uint8Array(N), LASTSEEN = new Float64Array(N).fill(-1);
 const sReveal = S[F.minoReveal], CLOSET = [21, -24.6]; // inside the closet
-for (let f = 0; f < N; f++) { if (f < F.minoReveal) { SM[f] = -1; continue; } minoOn[f] = f < F.halfShelf ? 1 : 0;
-  const gap = f < F.erase0 ? 9 + 3 * (1 - Math.min(1, (f - F.minoReveal) / 90)) : 4.5 + 2 * Math.max(0, 1 - (f - F.erase0) / 300);
-  SM[f] = Math.max(sReveal - 2.5, S[f] - gap); if (f >= F.door - 20) SM[f] = Math.min(SM[f], S[F.door] - 4.5); } // MINO stops at the door: not its route
-// the first 1.6 s after reveal MINO drives out of the closet onto the route (legal: straight line through its own open door)
-// emergence: A*-solved drive from inside the closet, through its door, onto the route at the join frame
-let KJ = 48, EMERGE = null, ESL = null;
-for (let it = 0; it < 3; it++) { const g = blocked(new Set(['mino_closet', 'hall_ward', 'ward_serv'])); const tgt = posAtS(SM[F.minoReveal + KJ]);
+const MSTATES = ['off', 'emerge', 'chase', 'lost', 'search', 'patrol', 'track'];
+// v10e MINO-7000 behaviour (no hidden-position feed). MINO moves only along the walked route corridor (collision-proven for a wider
+// body than MINO's), so every move is legal. It knows Wolfgang's position ONLY while it can see him: range <= 16 m, clear line of sight
+// past walls, units >= 1.4 m and doors (doors count as closed unless fully open for Wolfgang alone this frame, a conservative choice).
+//   chase  : seen this frame (after a 6-frame reaction on reacquire); target = his route coordinate minus a following gap; max 3.0 m/s
+//   lost   : not seen; drive to the LAST SEEN route coordinate at 2.4 m/s
+//   search : at the last seen point; hold and sweep for 120 frames (4 s)
+//   track  : ONLY in the authored chorus window [erase0, minoan) ('MINO pursues, erasing the thread'): when it cannot see him but is on the
+//            amber thread it line-follows the thread (a physical floor cue it is polishing) at 2.2 m/s. Set TRACK_THREAD=0 to disable.
+//   patrol : give up; return along the route toward its post near the closet at 1.0 m/s, sweeping; reacquire if seen
+const OCC_W = SOL.filter(s => s.h >= 1.4);
+const segHit = (ax, az, bx, bz, r) => { let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az; for (const [p, q] of [[-dx, ax - r.x0], [dx, r.x1 - ax], [-dz, az - r.z0], [dz, r.z1 - az]]) { if (Math.abs(p) < 1e-12) { if (q < 0) return false; } else { const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } } } return true; };
+const doorRectW = d => d.axis === 'x' ? { x0: d.x - d.w / 2, z0: d.z - 0.08, x1: d.x + d.w / 2, z1: d.z + 0.08 } : { x0: d.x - 0.08, z0: d.z - d.w / 2, x1: d.x + 0.08, z1: d.z + d.w / 2 };
+// doors opened by Wolfgang alone (pre-pass, same rule as the door state machine below minus MINO), used as LOS blockers
+const wDoorOpen = DOORS.map(d => { const a = new Float32Array(N); let o = 0; const H = HOLDINFO.find(h => h.door === d.id);
+  for (let f = 0; f < N; f++) { const w = posAtS(S[f]); let want = !d.staff && Math.hypot(w[0] - d.x, w[1] - d.z) < 4.6; if (H && f < H.stop[0] + H.notice) want = false; o = Math.max(0, Math.min(1, o + (want ? 1 : -1) / 11)); a[f] = o; } return a; });
+const sees = (m, w, f) => { const L = Math.hypot(w[0] - m[0], w[1] - m[1]); if (L > 16) return false; for (const r of OCC_W) if (segHit(m[0], m[1], w[0], w[1], r)) return false;
+  for (let di = 0; di < DOORS.length; di++) if (wDoorOpen[di][f] < 0.999 && segHit(m[0], m[1], w[0], w[1], doorRectW(DOORS[di]))) return false; return true; };
+let KJ = 48, EMERGE = null, ESL = null; const sJoin = Math.max(sReveal - 2.5, S[Math.min(N - 1, F.minoReveal + 48)] - 11);
+for (let it = 0; it < 3; it++) { const g = blocked(new Set(['mino_closet', 'hall_ward', 'ward_serv'])); const tgt = posAtS(sJoin);
   EMERGE = fillet(g, pull(g, astar(g, CLOSET, tgt))); ESL = [0]; for (let k = 1; k < EMERGE.length; k++) ESL.push(ESL[k - 1] + Math.hypot(EMERGE[k][0] - EMERGE[k - 1][0], EMERGE[k][1] - EMERGE[k - 1][1]));
   KJ = Math.max(36, Math.ceil(ESL[ESL.length - 1] / 2.6 * FPS)); }
 const emergeAt = u => { const L = ESL[ESL.length - 1] * u; let k = 1; while (k < ESL.length - 1 && ESL[k] < L) k++; const t = (L - ESL[k - 1]) / Math.max(1e-9, ESL[k] - ESL[k - 1]);
   return [EMERGE[k - 1][0] + (EMERGE[k][0] - EMERGE[k - 1][0]) * t, EMERGE[k - 1][1] + (EMERGE[k][1] - EMERGE[k - 1][1]) * t]; };
+const MSTATS = { chase: 0, lost: 0, search: 0, patrol: 0, track: 0, reacquired: 0, gave_up: 0 }, TRACK_THREAD = process.env.TRACK_THREAD !== '0';
+{ let sm = sJoin, st = 1, last = -1, timer = 0, react = 0, unseen = 0; const sPost = sJoin;
+  for (let f = 0; f < N; f++) { if (f < F.minoReveal) { SM[f] = -1; continue; } minoOn[f] = f < F.halfShelf ? 1 : 0;
+    const k = f - F.minoReveal; if (k < KJ) { SM[f] = sJoin; MST[f] = 1; LASTSEEN[f] = last; continue; }
+    const m = posAtS(sm), w = posAtS(S[f]), seen = sees(m, w, f);
+    if (seen) { if (st !== 2) { react++; if (react >= 6) { if (st >= 3) MSTATS.reacquired++; st = 2; react = 0; } } last = S[f]; } else react = 0;
+    if (st === 2 && !seen) { if (++unseen >= 8) st = 3; } else unseen = 0;            // 8-frame memory grace: keeps driving at the last seen point
+    const onThread = TRACK_THREAD && f >= F.erase0 && f < F.minoan && sm >= S[F.tie] - 0.5;
+    if (!seen && onThread && st !== 2) st = 6; else if (st === 6 && !onThread) { st = 4; timer = 120; last = sm + 0.9; }   // trail ends: search where the cue ran out
+    const gap = f < F.erase0 ? 6 : 4.5;
+    if (st === 2) { const tgt = last - gap; sm += Math.max(-0.05, Math.min(3.0 / FPS, tgt - sm)); }
+    else if (st === 3) { const tgt = last - 1.0; const d = tgt - sm; sm += Math.sign(d) * Math.min(Math.abs(d), 2.4 / FPS); if (Math.abs(tgt - sm) < 0.05) { st = 4; timer = 120; } }
+    else if (st === 4) { if (--timer <= 0) { st = 5; MSTATS.gave_up++; } }
+    else if (st === 6) { const tgt = S[f] - 1.6; sm += Math.max(0, Math.min(2.2 / FPS, tgt - sm)); }
+    else if (st === 5) { const d = sPost - sm; sm += Math.sign(d) * Math.min(Math.abs(d), 1.0 / FPS); }
+    else if (st === 1) st = seen ? 2 : 5;
+    if (f >= F.door - 20) sm = Math.min(sm, S[F.door] - 4.5);                                  // MINO stops at the exit hall: not its route
+    sm = Math.min(sm, S[f] - 1.6);                                                             // never inside or past the customer
+    SM[f] = sm; MST[f] = st; LASTSEEN[f] = last; if (minoOn[f]) MSTATS[MSTATES[st]] = (MSTATS[MSTATES[st]] || 0) + 1; } }
 const minoPos = f => { if (SM[f] < 0) return null; const k = f - F.minoReveal; if (k < KJ) { const t = k / KJ; return emergeAt(t * t * (3 - 2 * t)); } return posAtS(SM[f]); };
+// MINO body yaw: faces its direction of travel along the route (it reverses to patrol); holds heading while stopped
+const MYAW = new Float64Array(N); { let y = 0; for (let f = 0; f < N; f++) { if (SM[f] < 0) continue; const k = f - F.minoReveal;
+  if (k < KJ) { const a = minoPos(f), b = minoPos(Math.min(N - 1, f + 1)); if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-4) y = Math.atan2(b[0] - a[0], b[1] - a[1]); }
+  else { const ds = SM[Math.min(N - 1, f + 1)] - SM[f]; if (Math.abs(ds) > 1e-4) { const t = tanAt(SM[f]); y = ds > 0 ? Math.atan2(t[0], t[1]) : Math.atan2(-t[0], -t[1]); } } MYAW[f] = y; } }
 
 // ---------------------------------------------------------------- thread: anchored at the display bed, lies on the walked route behind him
 const sAnchor = S[F.tie], SPOOL = 420;
+const SMMAX = new Float64Array(N); { let mx = -1e9; for (let f = 0; f < N; f++) { if (SM[f] >= 0 && f >= F.erase0 && f < F.minoan) mx = Math.max(mx, SM[f]); SMMAX[f] = mx; } }
 const threadSpan = f => { if (f < F.tie) return null; let a = sAnchor, b = S[f];
-  if (f >= F.erase0 && f < F.minoan) a = Math.max(a, SM[f] + 0.6);         // MINO polishes the thread away as it chases
-  if (f >= F.minoan) a = Math.max(a, SM[F.minoan] + 0.6);
+  if (f >= F.erase0 && f < F.minoan && SMMAX[f] > -1e8) a = Math.max(a, SMMAX[f] + 0.6);   // MINO polishes away only the thread it has actually driven over
+  if (f >= F.minoan && SMMAX[F.minoan - 1] > -1e8) a = Math.max(a, SMMAX[F.minoan - 1] + 0.6);
   return b > a ? [a, b] : null; };
 
 // ---------------------------------------------------------------- door state machine: closed / opening / open / closing, driven by agents + thread
@@ -258,6 +305,7 @@ DOORS.forEach((d, di) => { let o = 0;
     const m = minoPos(f); if (m && Math.hypot(m[0] - d.x, m[1] - d.z) < DOOR_RANGE + 0.6) want = true;               // MINO opens staff doors too (it is staff)
     const th = threadSpan(f); if (th && !d.staff) { for (let s = th[0]; s <= th[1]; s += 0.5) { const p = posAtS(s); if (Math.hypot(p[0] - d.x, p[1] - d.z) < 0.9) { want = true; break; } } } // thread jams the door open
     if (d.id === 'mino_closet') want = f >= F.minoReveal - 24 && f < F.minoReveal + 90;
+    { const H = HOLDINFO.find(h => h.door === d.id); if (H && f < H.stop[0] + H.notice && f >= H.window[0]) want = false; }   // O1: opens only once he has stopped
     if (d.id === 'exit' && f < F.layArrow) want = false;                                                              // relocated exit: shuttered until the end
     if (d.id === 'hall_core' && f < F.finalChorus) want = want && f >= F.finalChorus;                                 // core->hall opens only for the escape
     o = Math.max(0, Math.min(1, o + (want ? 1 : -1) / DOOR_T)); doorOpen[di][f] = o; } });
@@ -311,7 +359,7 @@ for (let f = 0; f < N; f++) {
 }
 const uniq = a => { const seen = new Map(); for (const [f, k, ...r] of a) { const key = k + (r[0] || ''); if (!seen.has(key)) seen.set(key, { first: f, last: f, n: 0, what: [k, ...r].join(' ') }); const e = seen.get(key); e.last = f; e.n++; } return [...seen.values()]; };
 const summary = { dressing_items: DRESS.length, route_m: +LEN.toFixed(1), legs: LEGINFO.map(L => ({ label: L.label, len: +L.len.toFixed(1), s1: +L.s1.toFixed(1) })), leg_speed_scale: legScale,
-  pivots: PIVOTS, min_clearance_m: +report.min_clear.toFixed(3), wolfgang_hits: uniq(report.wolfgang), trolley_hits: uniq(report.trolley), mino_hits: uniq(report.mino), thread_hits: uniq(report.thread),
+  pivots: PIVOTS, holds: HOLDINFO, mino_behaviour: MSTATS, min_clearance_m: +report.min_clear.toFixed(3), wolfgang_hits: uniq(report.wolfgang), trolley_hits: uniq(report.trolley), mino_hits: uniq(report.mino), thread_hits: uniq(report.thread),
   closed_door_crossings: uniq(report.doors_crossed_closed.map(([f, who, id, o]) => [f, who, id, o])),
   pass: !report.wolfgang.length && !report.trolley.length && !report.mino.length && !report.thread.length && !report.doors_crossed_closed.length };
 fs.writeFileSync(path.join(OUT, 'nav_report.json'), JSON.stringify(summary, null, 1));
@@ -320,7 +368,7 @@ fs.writeFileSync(path.join(OUT, 'nav_report.json'), JSON.stringify(summary, null
 const sub = (arr, k = 1) => Array.from(arr).map(v => +v.toFixed(3));
 fs.writeFileSync(path.join(OUT, 'world.json'), JSON.stringify({ version: 'v10-greyblock', dress: DRESS, solids: SOL, doors: DOORS, zones: ZONES, labels: LABELS, route: ROUTE.map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]),
   route_s: sub(SL), legs: LEGINFO.map(({ grid, ...L }) => L), anchor: WP.anchor, closet: CLOSET, emerge: EMERGE, emerge_frames: KJ, wall_h: WH, spool_m: SPOOL }));
-fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify({ F, pivots: PIVOTS, yaw: sub(YAW), S: sub(S), SM: sub(SM), mino_on: Array.from(minoOn), s_anchor: +sAnchor.toFixed(3),
+fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify({ F, pivots: PIVOTS, yaw: sub(YAW), S: sub(S), SM: sub(SM), mino_on: Array.from(minoOn), mino_state: Array.from(MST), mino_states: MSTATES, mino_last_seen: sub(LASTSEEN), mino_yaw: sub(MYAW), holds: HOLDINFO, s_anchor: +sAnchor.toFixed(3),
   door_open: doorOpen.map(a => Array.from(a, v => +v.toFixed(3))), thread: Array.from({ length: N }, (_, f) => { const t = threadSpan(f); return t ? [+t[0].toFixed(2), +t[1].toFixed(2)] : 0; }) }));
 console.log(JSON.stringify(summary, null, 1));
 process.exit(summary.pass ? 0 : 2);

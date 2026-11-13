@@ -1,116 +1,269 @@
 {
- "generated": "2026-11-13",
- "source_commit_base": "bd8cf9963dcbb75bc975ec634106715646200b07",
+ "generated": "2026-11-13 (v10e)",
+ "repo": "github.com/steve81uk/Showroom-Labyrinth (PUBLIC)",
  "working_root": "/home/claude/showroom/track",
- "note": "Large media live in the working root, not in GitHub. Hashes let a new workspace verify it has the same inputs.",
- "audio": {
-  "audio_master.wav": {
-   "sha256": "eef852af2cc3e2c1cb888f27a2a399442e5791846412916daaec9857baf5b5c0",
+ "rule": "Private production assets (audio, manifest/lyrics, sprite + normal atlases, atlas metadata, background) are NOT pushed to the public repo. They are in the handover archive sent in chat and remain at risk until a private backup destination is approved.",
+ "private_local_only": [
+  {
+   "path": "audio_master.wav",
    "bytes": 40948218,
-   "format": "PCM s16le 48 kHz stereo",
-   "duration_s": 213.2,
-   "source": "Suno bff0ed1e-0748-4185-9d81-5a6810c35168 WAV download 11 Nov 2026",
-   "in_github": false
+   "sha256": "eef852af2cc3e2c1cb888f27a2a399442e5791846412916daaec9857baf5b5c0",
+   "role": "the recording (48 kHz s16 stereo, 213.200 s)",
+   "source": "Suno bff0ed1e-0748-4185-9d81-5a6810c35168, WAV download 11 Nov 2026",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
   },
-  "stems": "none present; all audio response is labelled full-mix analysis (manifest.acoustic *_env_30fps)"
- },
- "data": {
-  "manifest.json": {
+  {
+   "path": "manifest.json",
+   "bytes": 329013,
    "sha256": "4409ab9d7bf49683d4c8d3d2bb309ef8f984c0dc89953a407f28022a1156094d",
-   "bytes": 329013
+   "role": "timing + lyrics + acoustic analysis (beats, word/line times, envelopes)",
+   "source": "analysis/phase0.py + build_manifest.py on audio_master.wav (v2, 11 Nov)",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
   },
-  "atlas_map.json": {
-   "sha256": "b6309a05064df5adc16d469c3f7cf9c16ceed82cc5041f817219c7589f989c51",
-   "bytes": 884055
-  },
-  "bureau/world.json": {
-   "sha256": "d4b99a2a46ccccb76482eb0dbcf06b6832eae08785b9b1da303044f183b840bb",
-   "bytes": 132768
-  },
-  "bureau/timeline.json": {
-   "sha256": "5e41cb44a52e8e8fa0f1862b93e2c83a564cc19d86554bdcba193ff147ccd08a",
-   "bytes": 342675
-  },
-  "bureau/nav_report.json": {
-   "sha256": "dc8b39926d7a9ff951af3ff9881e7ee19c8800a80fe59a1b4ec2bf585dd441a7",
-   "bytes": 1056
-  },
-  "bureau/door_fit.json": {
-   "sha256": "7a40f2562426d0c14a8ce05376495e6431544457b6d2fc183ae49c9a336cddee",
-   "bytes": 1735
-  }
- },
- "character": {
-  "Master_Sprite_Atlas.png": {
+  {
+   "path": "Master_Sprite_Atlas.png",
+   "bytes": 6821260,
    "sha256": "6343a37ee8f7a361f883776cf7dbb450275fb3d21edc394268d9abba4fc46cbf",
-   "size": "4096x4096 RGBA",
-   "status": "present, NOT used by Engine v10 (v10 Wolfgang is a 3D grey-block placeholder)",
-   "in_github": false
+   "role": "Wolfgang + MINO approved sprite art, 4096x4096 RGBA",
+   "source": "Stephen (approved character art, packed by pack_atlas.py)",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
   },
-  "Master_Normal_Atlas.png": {
+  {
+   "path": "Master_Normal_Atlas.png",
+   "bytes": 5876985,
    "sha256": "ce00573d92106c07d1f951440f20c211388b36ec69ee6a0a5abc0fd1d4e50072",
-   "size": "4096x4096",
-   "status": "present, not used by v10"
+   "role": "luminance-embossed normal atlas (aligned, not used in v10e)",
+   "source": "generated from the sprite atlas (v9 pipeline)",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
   },
-  "bureau/assets/wolfgang_map_marker.png": {
-   "sha256": "0b02e187329f3ef68570191a8a38689d039a4149ab0ffbad5e4bf5bda970042a",
-   "source": "circular crop of docs/ref_wolfgang_noir_icon.jpg (Stephen-supplied approved reference, screenshot of agent_wolfgang_hybrid_cartoon_icon.png); crop centre (560,900) r=400, copper ring added",
-   "licence": "Stephen own character art",
-   "in_github": true
+  {
+   "path": "atlas_map.json",
+   "bytes": 884055,
+   "sha256": "b6309a05064df5adc16d469c3f7cf9c16ceed82cc5041f817219c7589f989c51",
+   "role": "atlas rects, pivots, world heights, push/leg rigs",
+   "source": "pack_atlas.py / rig_build2.py (v9)",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
   },
-  "references": [
-   "docs/ref_wolfgang_noir_icon.jpg",
-   "docs/ref_wolfgang_velvet_engagement.png",
-   "docs/ref_wolfgang_noir_dreameater.jpg"
-  ]
+  {
+   "path": "scene_background.png",
+   "bytes": 9044610,
+   "sha256": "b3d795e65eff9196399302f263e0dc0964adbac5815405e50b9bea1808665b17",
+   "role": "v9 background plate (unused by v10)",
+   "source": "v9 pipeline",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": false,
+   "backed_up_remotely": false
+  }
+ ],
+ "regenerated_not_stored": {
+  "bureau/world.json": "node bureau_world.js then bureau_validate.js --fit-doors",
+  "bureau/timeline.json": "node bureau_world.js",
+  "renders/*": "bureau_render.js"
  },
- "lighting_bake_v2": {
-  "solids.glb": {
+ "repo_assets": [
+  {
+   "path": "bureau/bake/solids.glb",
+   "bytes": 120664,
    "sha256": "a5adce70c46f6d6a42c391b4f79730f2fb72b882b0a3a78c304026931cd046b9",
-   "bytes": 120664
+   "role": "static store mesh, uv0 + uv1 (lightmap)",
+   "source": "blender_bake_v2.py",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
   },
-  "lm_solids.exr": {
+  {
+   "path": "bureau/bake/lm_solids.exr",
+   "bytes": 11407727,
    "sha256": "35f91b0fd570dea7f7826287c762a30c070a7d2df02335af8c7ee1cd0287cc5b",
-   "bytes": 11407727
+   "role": "irradiance lightmap, solids (half, denoised)",
+   "source": "blender_bake_v2.py + lm_denoise.py",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
   },
-  "lm_floor.exr": {
+  {
+   "path": "bureau/bake/lm_floor.exr",
+   "bytes": 6775517,
    "sha256": "41af0ca772548b2820ef1d871580b9b38df37cf0d3937139b5f0a602bc969cf5",
-   "bytes": 6775517
+   "role": "irradiance lightmap, floor (half, denoised)",
+   "source": "blender_bake_v2.py + lm_denoise.py",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
   },
-  "bake_v2.json": {
+  {
+   "path": "bureau/bake/bake_v2.json",
+   "bytes": 1026,
    "sha256": "5223222106400042d26f7ae34a8fad1dc226962aa66eb78fb9fe30317d4d0201",
-   "bytes": 1026
+   "role": "bake settings + stats",
+   "source": "blender_bake_v2.py",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
   },
-  "ref_cycles.png": {
-   "sha256": "871ddfe272a66c52bb8e0a38a02d0e022516f49498e47a74ce07d669b199687d",
-   "bytes": 552908
+  {
+   "path": "bureau/bake/denoise.json",
+   "bytes": 58,
+   "sha256": "9acd976070684e14f185514f9ceebd497f469fb1f1c849572197407567692130",
+   "role": "denoise record (sigma 1.5); raw maps deleted under O5",
+   "source": "lm_denoise.py",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": false
   },
-  "three_baked_compare.png": {
-   "sha256": "8e511ef47de7ff11b596e096cc108d269efb2086f62d68e43034f6636d1fd7cf",
-   "bytes": 185254
+  {
+   "path": "bureau/assets/wolfgang_map_marker.png",
+   "bytes": 88346,
+   "sha256": "0b02e187329f3ef68570191a8a38689d039a4149ab0ffbad5e4bf5bda970042a",
+   "role": "arcade-map portrait marker",
+   "source": "crop of docs/ref_wolfgang_noir_icon.jpg",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/bureau_world.js",
+   "bytes": 41202,
+   "sha256": "b09fb4a86fea95a40fa5d9536263490d5527c62ef6d356b14183129e4273b717",
+   "role": "world, routes, doors, door hold, MINO behaviour, thread",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/bureau_scene.js",
+   "bytes": 87901,
+   "sha256": "21c1a8107f5f4f4ef00ce0b0f132812371cd88e025cae0c35cd952115683e356",
+   "role": "browser scene (spliced into bureau_render.js)",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/bureau_render.js",
+   "bytes": 104897,
+   "sha256": "a923c17789185ba08dd75f33201a25eb162a690310f9dd87f0711ff7e65f0df6",
+   "role": "renderer + server + ffmpeg",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/bureau_validate.js",
+   "bytes": 17546,
+   "sha256": "7589486b510f551145378ad98b9a4a30b7002b271fee934490a8b8d58a8df8f2",
+   "role": "independent validator",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/lyric_dressing.js",
+   "bytes": 9155,
+   "sha256": "a3ea72f596826a3b162debb95342ccf45b19a24ef6a503328ebc2d1e07d0333d",
+   "role": "lyric-keyed set dressing",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/blender_bake_v2.py",
+   "bytes": 11987,
+   "sha256": "04100e31c07788249fff04cda09b474944654a9973b21fd57082a61178c4e18b",
+   "role": "lightmap bake",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/lm_denoise.py",
+   "bytes": 1917,
+   "sha256": "c09bc16c1ddebcff50442a7ddcf601eab4b169554c2db2d01600c9913f8e93dc",
+   "role": "lightmap denoise",
+   "source": "source",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/door_fit.json",
+   "bytes": 1737,
+   "sha256": "da02d88ee1fa425cf7ea7f2558cecb9ac01269149080b7902ad1305665cfcd41",
+   "role": "fitted swing doors",
+   "source": "bureau_validate.js --fit-doors",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/TEST_REPORT_world_full.json",
+   "bytes": 5677,
+   "sha256": "9c91717d5017c9092b0e40cc649a186c9e6087e381538eb116c5d613ecb2782c",
+   "role": "full-song validation",
+   "source": "bureau_validate.js",
+   "in_github_main_now": true,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": true
+  },
+  {
+   "path": "bureau/TEST_REPORT_strip_3650_3950.json",
+   "bytes": 2436,
+   "sha256": "d6e8f98152e7663db3fcd9c023885add49ba964e44d5e7b618f7b685b860f4ae",
+   "role": "strip validation incl. map",
+   "source": "bureau_validate.js",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": false
+  },
+  {
+   "path": "bureau/wolfgang_atlas_audit.json",
+   "bytes": 20358,
+   "sha256": "be6a4b8c08d5326aaf3c85198d82911f1b7901525976465892c427a19eeb23b5",
+   "role": "per-frame atlas audit",
+   "source": "audit script (this session)",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": false
+  },
+  {
+   "path": "bureau/bench_1080p30_v10e.json",
+   "bytes": 2194,
+   "sha256": "7eac49c8de33ae5c4c3e140545844bd3cfae60c70bcd32373ecebb01597b2aae",
+   "role": "1080p benchmark",
+   "source": "bureau_render.js timing",
+   "in_github_main_now": false,
+   "in_repo_after_this_commit": true,
+   "backed_up_remotely": false
   }
- },
- "lighting_bake_v2_raw_noisy": {
-  "location": "/home/claude/showroom/track/bureau/bake/lm_*_raw.exr",
-  "in_github": false,
-  "note": "pre-denoise bake output, kept for re-denoising"
- },
- "deprecated": {
-  "bureau/bake/v1_deprecated/*": "v1 prototype bake (outdoor sun not in the Three.js scene, 8-bit PNG/JPG with 30% of floor texels clipped at 255, shared atlas). Not loaded by any code. Proposed for deletion, awaiting approval."
- },
- "third_party": {
-  "three": "0.169.0 (npm, MIT)",
-  "puppeteer/chromium": "chromium-1243 headless, SwiftShader",
-  "blender": "bpy 5.3.0 (pip, GPL; used as a tool, outputs are ours)",
+ ],
+ "dependencies": {
+  "three": "0.169.0",
+  "puppeteer chromium": "1243 (SwiftShader)",
+  "node": "22.23.4",
+  "blender bpy": "5.3.0",
   "ffmpeg": "6.1.1",
-  "fonts": "DejaVu Sans / Sans Mono (system)",
-  "external_models": "none"
+  "python": "3.13 (bpy) / numpy, Pillow"
  },
- "outputs": {
-  "strip_mkv": {
-   "path": "/home/claude/showroom/track/renders/v10d_strip/Bureau_Showroom_Labyrinth_v10_Range_3700_4000_1280x720_30fps_DEBUG.mkv",
-   "sha256": "c975867ae094258937530b2823ad3f9da00d7cd6e05d74423d32220aa39a1a9d",
-   "in_github": false
-  }
+ "render_settings": {
+  "fps": 30,
+  "master_res": "1920x1080",
+  "codec": "libx264 CRF 16 veryfast (strip) / slow (master), BT.709 tv range, AAC 320k 48 kHz, .mkv",
+  "flags": "bake=1"
  }
 }

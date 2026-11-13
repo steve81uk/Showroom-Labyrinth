@@ -24,3 +24,23 @@
 - O3: Check-in 5 on the car park rise: arcade map, 3D rise, or both.
 - O4: Wire the approved sprite atlas into v10 (preferred) or approve a new 3D Wolfgang build.
 - O5: Delete `bureau/bake/v1_deprecated/` (4 files, 1.7 MB) and noisy `*_raw.exr` in the working root (23.6 MB)?
+
+## v10e (2026-11-13 evening)
+| # | Decision | Why |
+|---|---|---|
+| D16 | Wolfgang = approved atlas on a ground-pivoted camera-facing billboard (2.5D), with the v9 cut-out push rig for side views with the trolley. | O4: existing approved art first; no new 3D character. |
+| D17 | Sprites are tinted by baked floor irradiance at his position, not lit by live lights. | Live hemi/sun/MINO lights tinted the painted art orange and crushed the coat; the art carries its own shading. |
+| D18 | Normal atlas is not used. | It is luminance-embossed, not authored normals; it added false relief. |
+| D19 | No fallback to the placeholder; asset failure is an engine error. | Brief: block the master if the real character fails to load. |
+| D20 | Idle: 3/4 standing poses (native left/right), push rig at zero stride when stopped with the trolley. | No walking in place; avoids mirroring when idle. |
+| D21 | Door wait: authored local retime at ward_serv, stop 2.0 m out, door sensor gated until he has stopped + 6 frames. | O1, music untouched. |
+| D22 | Check-in 4 capped to 90 frames; door wait on a locked side camera chosen by free space. | Wait must read at ground level; only this shot changed. |
+| D23 | MINO behaviour: chase on sight only, last-seen memory, bounded search, patrol; authored thread-tracking only in the chorus window. | Brief section 6; the thread is a visible floor cue in an authored beat. Strict variant available. |
+| D24 | Private assets stay out of the public repo; handover archive supplied. | Repo is public; no approval to publish audio, lyrics or raw character art. |
+
+## Open decisions
+- O6: Keep MINO's authored thread-tracking in the chorus (default) or use the strict variant (MINO patrols from frame 3803 until the break).
+- O7: MINO has no pursuit after 4841 under the new rules. Accept, or author a legal reacquisition beat for the final chorus (for example, a sighting through an open doorway).
+- O8: Private backup destination for audio, manifest and atlases (private repo, private release, or Drive).
+- O9: Native 60 fps requires a 60 Hz timeline rebuild. Proceed, or master at native 30.
+- O10: Bare paws (walk_front) vs shoes (side/back) in the approved art: accept, or approve an art fix.

@@ -101,6 +101,16 @@ const OCC = W.solids.filter(s => s.h >= 1.4), doorR = d => d.axis === 'x' ? { x0
 const segRect = (ax, az, bx, bz, r) => { let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az; for (const [p, q] of [[-dx, ax - r.x0], [dx, r.x1 - ax], [-dz, az - r.z0], [dz, r.z1 - az]]) { if (Math.abs(p) < 1e-12) { if (q < 0) return false; } else { const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } } } return true; };
 let losClear = 0, losBlocked = 0; for (let f = A; f < B; f++) { const m = T.mino_on[f] ? minoXZ(f) : null; if (!m) continue; const w = posAt(T.S[f]); let blocked = OCC.some(r => segRect(m[0], m[1], w[0], w[1], r));
   W.doors.forEach((d, di) => { if (doorOpen(di, f) < 0.5 && segRect(m[0], m[1], w[0], w[1], doorR(d))) blocked = true; }); blocked ? losBlocked++ : losClear++; }
+// ---- MINO behaviour legality (v10e): no hidden-position feed, LOS-backed chase, speed limits
+let mbeh = null; if (T.mino_state) { const NM = T.mino_states, bad = { chase_without_recent_los: [], lost_search_beyond_last_seen: [], last_seen_updated_without_los: [], speed_over_3mps: [] }; let lastLos = -999;
+  const losAt = (f, fm = f) => { const m = minoXZ(fm), w = posAt(T.S[f]); if (!m || Math.hypot(w[0] - m[0], w[1] - m[1]) > 16) return false; if (OCC.some(r => segRect(m[0], m[1], w[0], w[1], r))) return false;
+    for (let di = 0; di < W.doors.length; di++) if (doorOpen(di, f) < 0.999 && segRect(m[0], m[1], w[0], w[1], doorR(W.doors[di]))) return false; return true; };
+  const cnt = {}; for (let f = Math.max(A, 1); f < B; f++) { const st = NM[T.mino_state[f]]; if (!T.mino_on[f] || st === 'off') continue; cnt[st] = (cnt[st] || 0) + 1; const los = losAt(f); if (los) lastLos = f;
+    if (st === 'chase' && f - lastLos > 8) bad.chase_without_recent_los.push([f, 'chase']);
+    if ((st === 'lost' || st === 'search') && T.SM[f] > T.mino_last_seen[f] - 0.9 + 0.05) bad.lost_search_beyond_last_seen.push([f, st]);
+    if (T.mino_last_seen[f] !== T.mino_last_seen[f - 1] && T.mino_last_seen[f] >= 0 && !los && !losAt(f, f - 1) && NM[T.mino_state[f - 1]] !== 'track') bad.last_seen_updated_without_los.push([f, 'update']);
+    if (st !== 'emerge' && NM[T.mino_state[f - 1]] !== 'emerge' && Math.abs(T.SM[f] - T.SM[f - 1]) > 3.0 / M.fps + 0.01) bad.speed_over_3mps.push([f, st]); }
+  mbeh = { frames_by_state: cnt, violations: Object.fromEntries(Object.entries(bad).map(([k, v]) => [k, groups(v)])), pass: Object.values(bad).every(v => v.length === 0) }; }
 // ---- optional: map correspondence from the browser log
 let map = null; const ml = arg('--maplog'); if (ml) { const L = JSON.parse(fs.readFileSync(ml)); let n = 0, maxW = 0, maxPx = 0, maxM = 0, maxT = 0;
   for (const [fs_, e] of Object.entries(L)) { const f = +fs_, w = posAt(T.S[f]); n++; maxW = Math.max(maxW, Math.hypot(e.wolf3d[0] - w[0], e.wolf3d[1] - w[1]));
@@ -113,10 +123,10 @@ let map = null; const ml = arg('--maplog'); if (ml) { const L = JSON.parse(fs.re
 const leafStructure = []; W.doors.filter(d => d.kind === "swing").forEach(d => { for (let o = 0; o <= 1.0001; o += 0.02) for (const Lp of leafPolys(d, o)) for (const r of OBST) if (sat(Lp, aabbPoly(r))) { leafStructure.push([+o.toFixed(2), `${d.id} vs ${r.kind}`]); break; } });
 hits.door_leaf_vs_structure = leafStructure;
 const summary = Object.fromEntries(Object.entries(hits).map(([k, v]) => [k, groups(v)]));
-const pass = Object.values(hits).every(v => v.length === 0) && (!map || map.pass);
+const pass = Object.values(hits).every(v => v.length === 0) && (!map || map.pass) && (!mbeh || mbeh.pass);
 const rep = { tool: 'bureau_validate.js v10d', range: { startFrame: A, endFrame: B, convention: 'start inclusive, end exclusive' }, fps: M.fps, substeps_per_frame: SUB,
   shapes: { wolfgang_circle_m: R_W, trolley_obb_m: [TROL.hw * 2, TROL.hl * 2], trolley_ahead_m: TROL.ahead, mino_circle_m: R_M, thread_radius_m: R_T, thread_side_offset_m: THREAD_OFF, swing_leaf: 'panel w x 0.06, hinge -w/2, sweep 0..85.5 deg', sliding_leaf: 'w/2 x 0.08 pane' },
   min_clearance_wolfgang_m: +minClear.wolfgang.toFixed(3), hits: summary, door_states: doorStates, door_approach: approach,
-  mino_line_of_sight: { frames_clear: losClear, frames_blocked: losBlocked }, map_correspondence: map, pass };
+  mino_line_of_sight: { frames_clear: losClear, frames_blocked: losBlocked }, mino_behaviour: mbeh, holds: T.holds || [], map_correspondence: map, pass };
 const out = arg('--out', null); if (out) fs.writeFileSync(out, JSON.stringify(rep, null, 1));
-console.log(JSON.stringify({ pass, range: rep.range, hits: Object.fromEntries(Object.entries(summary).map(([k, v]) => [k, v.length])), min_clear: rep.min_clearance_wolfgang_m, approach, los: rep.mino_line_of_sight, map }, null, 1));
+console.log(JSON.stringify({ pass, range: rep.range, hits: Object.fromEntries(Object.entries(summary).map(([k, v]) => [k, v.length])), min_clear: rep.min_clearance_wolfgang_m, approach, los: rep.mino_line_of_sight, mino: mbeh, map }, null, 1));

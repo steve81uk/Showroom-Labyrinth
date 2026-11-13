@@ -43,9 +43,12 @@ async function sceneMain(THREE, X) {
   const telIdx = new Int32Array(N); { let k = 0; for (let f = 0; f < N; f++) { while (k + 1 < TEL.length && TEL[k + 1].frame <= f) k++; telIdx[f] = k; } }
   const telAt = f => TEL[telIdx[clamp(f, 0, N - 1)]];
   // authored map check-ins: a contiguous MAP run whose first row carries MAP_CHECKIN_<n> (frame-0 MAP intro is not a check-in)
-  const MAPCHK = new Int32Array(N); { let cur = 0, prev = ''; for (let f = 0; f < N; f++) { const t = telAt(f), m = t.camera_mode;
+  const MAPCHK = new Int32Array(N), MAPFADE = new Float32Array(N).fill(1); { let cur = 0, prev = ''; for (let f = 0; f < N; f++) { const t = telAt(f), m = t.camera_mode;
     if (m === 'MAP' && prev !== 'MAP') { const ev = TEL.filter(x => x.frame >= f && x.frame < f + 2 && x.camera_mode === 'MAP').map(x => String(x.special_events)).join(' '); const mm = /MAP_CHECKIN_(\d+)/.exec(ev); cur = mm ? +mm[1] : 0; }
-    MAPCHK[f] = m === 'MAP' ? cur : 0; prev = m; } }
+    MAPCHK[f] = m === 'MAP' ? cur : 0; prev = m; }
+    // v10e: check-in 4 is capped at 90 frames so the door wait at ward_serv (frames ~3811-3870) plays as a ground-level shot, not under the map
+    { const s4 = MAPCHK.indexOf(4); if (s4 >= 0) for (let f = s4 + 90; f < N && MAPCHK[f] === 4; f++) MAPCHK[f] = 0; }
+    for (const t of TEL) { const mm = /MAP_CHECKIN_(\d+)/.exec(String(t.special_events)); if (mm && t.camera_mode !== 'MAP') for (let f = t.frame; f < Math.min(N, t.frame + 60); f++) { MAPCHK[f] = +mm[1]; MAPFADE[f] = clamp((t.frame + 60 - f) / 18, 0, 1); } } }
   const secAt = f => { const t = f / FPS; let s = M.sections[0]; for (const x of M.sections) if (x.start_s <= t + 1e-6) s = x; return s; };
   const BEATS = A.beats_s; const beatAt = t => { let lo = 0, hi = BEATS.length - 1; if (t < BEATS[0]) return 0; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (BEATS[m] <= t) lo = m; else hi = m; } return lo; };
 
@@ -111,12 +114,12 @@ async function sceneMain(THREE, X) {
   // ---------------------------------------------------------------- v10d BAKE: Blender Cycles irradiance lightmaps (bureau/bake, see DECISIONS.md)
   // Maps hold irradiance only (no albedo). MeshBasicMaterial (r169): indirectDiffuse = map * intensity / PI, then *= colour,
   // so intensity = PI displays albedo x irradiance exactly once and scene lights cannot double-light the store.
-  let BK = null;
+  let BK = null, LMF = null;
   if (BAKE) { BK = await (await fetch('bureau/bake/bake_v2.json')).json();
     const exr = new X.EXRLoader(); exr.setDataType(THREE.HalfFloatType);
     const [lmS, lmF, glb] = await Promise.all([exr.loadAsync('bureau/bake/lm_solids.exr'), exr.loadAsync('bureau/bake/lm_floor.exr'), new X.GLTFLoader().loadAsync('bureau/bake/solids.glb')]);
     for (const t of [lmS, lmF]) { t.channel = 1; t.colorSpace = THREE.LinearSRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.needsUpdate = true; }
-    BINM.forEach(m => { store.remove(m); m.geometry.dispose(); });
+    LMF = lmF; BINM.forEach(m => { store.remove(m); m.geometry.dispose(); });
     const used = {}; let uv1n = 0;
     glb.scene.traverse(o => { if (!o.isMesh) return; const nm = (o.material.name || '').replace(/\.\d+$/, ''); used[nm] = (used[nm] || 0) + 1; if (o.geometry.attributes.uv1) uv1n++;
       if (!LMFLIP) { /* verified: EXR rows bottom-up (Blender v); glTF exports 1 - v, so flip uv1 back */ const a = o.geometry.attributes.uv1; for (let i = 0; i < a.count; i++) a.setY(i, 1 - a.getY(i)); }
@@ -199,6 +202,75 @@ async function sceneMain(THREE, X) {
   lantern.add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), mat(0xb08a3a, { metalness: 0.9, roughness: 0.35 })));
   const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.9, 0.6) })); lantern.add(flame);
   const lanternLight = new THREE.PointLight(0xffa640, 6, 7, 2); lantern.add(lanternLight);
+  // ================================================================ v10e WOLFGANG: approved sprite atlas, 2.5D. The placeholder group above stays as the invisible
+  // authoritative transform (navigation, map, trolley all read `wolf`); every placeholder mesh is hidden. No fallback: a missing asset is an engine error.
+  const ATL = await (await fetch('atlas_map.json')).json();
+  const texL = new THREE.TextureLoader();
+  let atlasTex, normalTex;
+  try { [atlasTex, normalTex] = await Promise.all([texL.loadAsync('Master_Sprite_Atlas.png'), texL.loadAsync('Master_Normal_Atlas.png')]); }
+  catch (e) { throw new Error('WOLFGANG ASSET LOAD FAILED (Master_Sprite_Atlas.png / Master_Normal_Atlas.png): refusing to render a placeholder'); }
+  if (!atlasTex.image || atlasTex.image.width !== ATL.atlas_w || normalTex.image.width !== ATL.atlas_w) throw new Error('WOLFGANG ATLAS SIZE MISMATCH');
+  atlasTex.colorSpace = THREE.SRGBColorSpace; atlasTex.anisotropy = 8; normalTex.colorSpace = THREE.NoColorSpace;
+  const SPS = (ATL.animations.walk_side.world_height_m || 1.95) / ATL.cell_h;              // metres per atlas pixel (1.95 m per 512 px cell)
+  // Lighting decision (v10e): the painted atlas already carries its own form shading, so Wolfgang is NOT re-lit by the scene's live lights
+  // (they tinted him orange/red and crushed the coat). He is tinted by the SAME baked irradiance the floor receives at his feet (bake v2),
+  // so he sits in the store's light; the normal atlas (luminance-embossed, not authored normals) is not used.
+  const irrAt = (x, z) => { if (!LMF) return 0.9; const im = LMF.image, Wd = im.width, Hd = im.height, d = im.data, u = (x + 36) / 72, v = (26 - z) / 52; let acc = 0, n = 0;
+    for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const i = Math.round(clamp(u, 0, 1) * (Wd - 1)) + di * 6, j = Math.round(clamp(v, 0, 1) * (Hd - 1)) + dj * 6; if (i < 0 || j < 0 || i >= Wd || j >= Hd) continue;
+      const k = (j * Wd + i) * 4, toF = typeof d[k] === 'number' && d instanceof Uint16Array ? THREE.DataUtils.fromHalfFloat : (q => q); acc += (toF(d[k]) + toF(d[k + 1]) + toF(d[k + 2])) / 3; n++; } return n ? acc / n : 0.9; };
+  const sprMat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide });
+  if (BAKE) for (const D of DOORS) { const L_ = Math.min(1.1, irrAt(D.d.x, D.d.z)); D.g.traverse(o => { if (o.isMesh && !o.userData.bk) { const m0 = o.material;
+      o.material = new THREE.MeshBasicMaterial({ color: m0.color.clone().multiplyScalar(L_), transparent: m0.transparent, opacity: m0.opacity, map: m0.map || null }); o.userData.bk = true; } }); }
+  const sprGeo = new THREE.PlaneGeometry(1, 1), sprite = new THREE.Mesh(sprGeo, sprMat); sprite.renderOrder = 3;
+  const sprGroup = new THREE.Group(); const sprTilt = new THREE.Group(); sprGroup.add(sprTilt); sprTilt.add(sprite); scene.add(sprGroup);
+  const uvA = sprGeo.attributes.uv;
+  const setFrame = (anim, i, mirror) => { const fr = ATL.animations[anim].frames[i], [x, y, w, h] = fr.rect, [px, py] = fr.pivot, AW = ATL.atlas_w, AH = ATL.atlas_h;
+    const u0 = x / AW, u1 = (x + w) / AW, v0 = 1 - (y + h) / AH, v1 = 1 - y / AH;            // atlas rects are top-left origin (atlas_map v_flip_note)
+    // PlaneGeometry uv order: (0,1) (1,1) (0,0) (1,0)
+    const L = mirror ? u1 : u0, R = mirror ? u0 : u1; uvA.setXY(0, L, v1); uvA.setXY(1, R, v1); uvA.setXY(2, L, v0); uvA.setXY(3, R, v0); uvA.needsUpdate = true;
+    sprite.scale.set(w * SPS, h * SPS, 1); const ox = (mirror ? -1 : 1) * (w / 2 - px) * SPS; sprite.position.set(ox, (py - h / 2) * SPS, 0); /* pivot (feet) at the group origin */
+  };
+  // ---- v9 cut-out push rig, ported without the mouth / blink / ear extras (no new art: body = approved trolley_push drawing with legs erased,
+  //      legs = one drawn leg from walk_side[0], used near and far). Drawn trolley inside the art replaces the 3D trolley in side views.
+  function buildSkin(rig, mat, zOff) {
+    const an = ATL.animations[rig.anim], fr = an.frames[rig.frame], [ax, ay] = fr.rect, [pvx, pvy] = rig.pivot;
+    const nV = rig.vertices.length, pos = new Float32Array(nV * 3), uv = new Float32Array(nV * 2), si = new Uint16Array(nV * 4), sw = new Float32Array(nV * 4);
+    rig.vertices.forEach(([x, y], i) => { pos.set([x - pvx, pvy - y, zOff], i * 3); uv.set([(ax + x) / ATL.atlas_w, 1 - (ay + y) / ATL.atlas_h], i * 2); si.set(rig.skinIndex[i], i * 4); sw.set(rig.skinWeight[i], i * 4); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4)); g.setIndex(rig.index); g.computeVertexNormals();
+    const B = {}, Pp = {}; rig.bones.forEach(([n, , x, y]) => { Pp[n] = [x, y]; });
+    rig.bones.forEach(([n, par, x, y]) => { const b = new THREE.Bone(); b.name = n; const [px, py] = par ? Pp[par] : [pvx, pvy]; b.position.set(x - px, -(y - py), 0); B[n] = b; if (par) B[par].add(b); });
+    const mesh = new THREE.SkinnedMesh(g, mat); mesh.frustumCulled = false; const rootBone = B[rig.bones[0][0]]; mesh.add(rootBone); mesh.bind(new THREE.Skeleton(rig.bones.map(b => B[b[0]])));
+    const rest = {}; for (const n in B) rest[n] = B[n].position.clone(); return { mesh, B, rest }; }
+  class CutoutPush { constructor(bodyRig, legRig) {
+      const mk = c => new THREE.MeshBasicMaterial({ map: atlasTex, alphaTest: 0.5, side: THREE.DoubleSide, color: c });
+      this.mats = [mk(0xffffff), mk(0xffffff), mk(0x8a8a90)]; this.body = buildSkin(bodyRig, this.mats[0], 0);
+      this.legs = { near: buildSkin(legRig, this.mats[1], -1.5), far: buildSkin(legRig, this.mats[2], -3.0) };
+      const at = bodyRig.leg_attach, lb = bodyRig.bones.find(b => b[0] === 'legs'), hipX = lb[2]; this.hipY0 = lb[3]; this.groundY = bodyRig.pivot[1];
+      for (const k of ['near', 'far']) { const L = this.legs[k]; this.body.B.legs.add(L.mesh); L.mesh.position.set(at[k][0] - hipX, 0, 0); L.mesh.scale.setScalar(legRig.scale_to_push || 1); }
+      const J = legRig.joints; this.l1 = J.knee[1] - J.hip[1]; this.l2 = J.ankle[1] - J.knee[1]; this.soleD = J.sole - J.ankle[1];
+      { const hd = bodyRig.bones.find(b => b[0] === 'head'), sh = new THREE.Shape(); bodyRig.mouth.forEach(([x, y], i) => i ? sh.lineTo(x - hd[2], -(y - hd[3])) : sh.moveTo(x - hd[2], -(y - hd[3])));
+        this.mouthM = new THREE.MeshBasicMaterial({ color: 0xd2d6db, side: THREE.DoubleSide }); const mm = new THREE.Mesh(new THREE.ShapeGeometry(sh), this.mouthM); mm.position.z = -0.6; this.body.B.head.add(mm); }   /* closed-mouth fill (v9 mouth polygon) */
+      this.root = new THREE.Group(); this.tilt = new THREE.Group(); this.root.add(this.tilt); this.flip = new THREE.Group(); this.tilt.add(this.flip); this.flip.add(this.body.mesh); this.body.mesh.scale.setScalar(SPS); this.root.visible = false; }
+    pose(phase, amp) { const d2r = Math.PI / 180, ph = phase * Math.PI * 2, bd = this.body, B = bd.B; for (const n in B) { B[n].rotation.set(0, 0, 0); B[n].position.copy(bd.rest[n]); }
+      const th0 = -7 * d2r * amp - 3 * d2r, A = 27 * d2r * amp, K = 0.8 * amp; let depth = 0;
+      for (const [k, o] of [['near', 0], ['far', Math.PI]]) { const L = this.legs[k], LB = L.B; for (const n in LB) { LB[n].rotation.set(0, 0, 0); LB[n].position.copy(L.rest[n]); }
+        const q = ph + o, th = th0 + A * Math.cos(q), sw = Math.max(0, -Math.sin(q)), early = Math.max(0, Math.cos(q)) > 0 ? 1 : 0.55, flex = K * Math.pow(sw, 1.4) * early + 0.06 * amp;
+        const peel = 0.35 * amp * Math.max(0, Math.sin(q - Math.PI * 0.5)) * (Math.cos(q) < 0 ? 1 : 0);
+        LB.hip.rotation.z = th; LB.knee.rotation.z = -flex; LB.ankle.rotation.z = flex - th + peel;
+        depth = Math.max(depth, this.l1 * Math.cos(th) + this.l2 * Math.cos(th - flex) + this.soleD * Math.cos(peel) - 4 * Math.sin(peel)); }
+      const rel = (this.groundY - depth * this.legs.near.mesh.scale.x) - this.hipY0; B.legs.position.y = bd.rest.legs.y - rel * 0.45; B.hip.position.y = bd.rest.hip.y - rel * 0.55;
+      B.spine.rotation.z = -0.03 * amp * Math.cos(ph * 2); B.head.rotation.z = 0.04 * amp * Math.sin(ph * 2 + 0.6); B.coat.rotation.z = 0.035 * amp * Math.sin(ph * 2 - 0.4);
+      B.tail0.rotation.z = 0.10 * Math.sin(ph * 2 - 0.5) * (0.4 + amp); B.tail1.rotation.z = 0.16 * Math.sin(ph * 2 - 1.1) * (0.4 + amp); B.tail2.rotation.z = 0.22 * Math.sin(ph * 2 - 1.7) * (0.4 + amp);
+      this.root.updateMatrixWorld(true); }
+    set mirror(m) { this.flip.scale.set(m ? -1 : 1, 1, 1); }
+    tint(c) { this.mouthM.color.setHex(0xd2d6db).multiply(c); this.mats[0].color.copy(c); this.mats[1].color.copy(c); this.mats[2].color.copy(c).multiplyScalar(0.55); } }
+  if (!ATL.rigs || !ATL.rigs.push_body || !ATL.rigs.leg) throw new Error('WOLFGANG PUSH RIG MISSING in atlas_map.json');
+  const pushRig = new CutoutPush(ATL.rigs.push_body, ATL.rigs.leg); scene.add(pushRig.root);
+  const CART_AHEAD = (560 - ATL.rigs.push_body.pivot[0]) * SPS;                             // drawn cart centre ahead of the rig pivot (measured: 0.87 m)
+  const WSTAT = { frames: 0, front: 0, side: 0, side_mirrored: 0, back: 0, idle: 0, push_rig: 0, push_front_back_no_contact: 0 }; window.wolfStats = WSTAT;
+  // thread belt anchor: the thread rises from the floor to a fixed point at his belt (hip height, camera side) so it never ends in mid-air
+  const beltM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.95, 0.58, 0.09) }), belt = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 6), beltM); belt.visible = false; scene.add(belt);
   const feet = [-1, 1].map(sd => { const f_ = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.26), mat(0x1a1a1c)); f_.position.set(sd * 0.12, 0.04, 0); wolf.add(f_); return f_; });
   const trolley = new THREE.Group(); scene.add(trolley);
   { const wire = mat(0xb8bec4, { metalness: 0.9, roughness: 0.3, wireframe: false }); const bas = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.5, 0.85), new THREE.MeshStandardMaterial({ color: 0xb8bec4, metalness: 0.9, roughness: 0.3, transparent: true, opacity: 0.55 }));
@@ -240,16 +312,19 @@ async function sceneMain(THREE, X) {
   const los = (m, w, f) => { const L = Math.hypot(w.x - m.x, w.z - m.z); return rayLen(m.x, m.z, Math.atan2(w.x - m.x, w.z - m.z), L, f) >= L - 1e-3; };
   window.losAt = f => { const m = minoXZ(f), w = posAt(S[f]); return m ? los(m, w, f) : null; };
   // sensor yaw per frame: sweeps +-60 deg until Wolfgang falls inside the beam within 16 m (detection), then locks on with a limited turn rate
+  const MSN = TL.mino_states || [], mstate = f => MSN[(TL.mino_state || [])[f]] || 'chase';
   const SENS = new Float32Array(N); let DETECT = -1; { let ys = 0;
-    for (let f = F.minoReveal; f < N; f++) { const m = minoXZ(f); if (!m) continue; const nx = minoXZ(Math.min(N - 1, f + 1)) || m, body = (f - F.minoReveal < WD.emerge_frames) ? Math.atan2(nx.x - m.x, nx.z - m.z) : Math.atan2(...(() => { const h_ = headAt(SM[f]); return [h_.x, h_.z]; })());
-      const w = posAt(S[f]), toW = Math.atan2(w.x - m.x, w.z - m.z); let tgt;
-      if (DETECT < 0) { tgt = body + Math.sin((f - F.minoReveal) / FPS * 2.4) * 1.05; let d = toW - tgt; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
-        if (f - F.minoReveal > WD.emerge_frames && Math.abs(d) < 0.25 && m.distanceTo(w) < 16 && los(m, w, f)) DETECT = f; }
-      else tgt = toW;
+    for (let f = F.minoReveal; f < N; f++) { const m = minoXZ(f); if (!m) continue; const st = mstate(f), body = TL.mino_yaw ? TL.mino_yaw[f] : 0, t = (f - F.minoReveal) / FPS; let tgt;
+      if (st === 'chase') { const ls = TL.mino_last_seen[f], p = posAt(ls >= 0 ? ls : S[f]); tgt = Math.atan2(p.x - m.x, p.z - m.z); if (DETECT < 0) DETECT = f; }   // aims at the LAST SEEN point
+      else if (st === 'search') tgt = body + Math.sin(t * 1.6) * 1.5;          // wide sweep where it lost him
+      else if (st === 'patrol') tgt = body + Math.sin(t * 2.4) * 1.05;
+      else if (st === 'track') tgt = body + Math.sin(t * 3.0) * 0.35;          // nose down the thread
+      else tgt = body;
       let d = tgt - ys; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; ys += clamp(d, -0.12, 0.12); SENS[f] = ys; } }
   const warnRing = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.62, 48), new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false }));
   warnRing.rotation.x = -Math.PI / 2; scene.add(warnRing);
 
+  wolf.traverse(o => { if (o.isMesh) o.visible = false; }); lanternLight.intensity = 0; wolf.userData.placeholderHidden = true;
   // ---------------------------------------------------------------- dynamic ribbons: amber thread (on the walked route) and MINO's polished trail
   const ribbon = (matr, maxN) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(maxN * 6), 3)); g.setIndex(Array.from({ length: (maxN - 1) * 6 }, (_, i) => { const q = (i / 6) | 0, k = i % 6; return [0, 1, 2, 2, 1, 3][k] + q * 2; }));
     const m = new THREE.Mesh(g, matr); m.frustumCulled = false; scene.add(m); return { m, g, maxN }; };
@@ -281,7 +356,7 @@ async function sceneMain(THREE, X) {
   const mYaw = f => { const m = minoXZ(f); if (!m) return 0; const m2 = minoXZ(Math.min(N - 1, f + 3)) || m; const d = m2.clone().sub(m); return d.lengthSq() > 1e-6 ? Math.atan2(d.x, d.z) : headAtYaw(SM[f]); };
   const headAtYaw = s0 => { const h_ = headAt(s0); return Math.atan2(h_.x, h_.z); };
   const shotAt = f => { const mode = (telAt(f).camera_mode || 'MAP'), t = f / FPS, bar = Math.floor(beatAt(t) / 4), mOn = TL.mino_on[f] && SM[f] >= 0 && f >= F.minoReveal + WD.emerge_frames;
-    if (QASHOT) return QASHOT; if (mode === 'BLACK') return 'black'; if (mode === 'MAP' && MAPCHK[f]) return 'map'; if (f < F.pickBox && mode !== 'FPV') return 'over'; if (f >= F.ext && mode !== 'FPV') return 'over';
+    if (QASHOT) return QASHOT; if (mode === 'BLACK') return 'black'; if (MAPCHK[f]) return 'map'; if (mode === 'MAP' && f >= F.minoReveal) { const H_ = (TL.holds || [])[0]; return H_ && f < H_.stop[1] + 15 ? 'w3side' : 'w3'; }   /* tail of capped check-in 4: ground-level door wait */ if (f < F.pickBox && mode !== 'FPV') return 'over'; if (f >= F.ext && mode !== 'FPV') return 'over';
     if (mode === 'FPV') return 'w1'; if (mode === 'SCROLL') return 'w3side'; if (mode === 'MAP_ORBIT') return 'orbit'; if (mode === 'SCAN') return 'pan';
     if (mode === 'CLOSE') return mOn ? 'm1' : 'w3close'; if (mode === 'CHASE_LOW') return mOn ? 'm3low' : 'w3';
     if (mode === 'CHASE_FAST') { const k = ((bar % 4) + 4) % 4; return k < 2 ? 'over' : k === 2 ? 'w3' : (mOn ? 'm3' : 'w3'); }
@@ -306,7 +381,7 @@ async function sceneMain(THREE, X) {
   // ---------------------------------------------------------------- HUD: diegetic Bureau receipt + debug
   const SPOOL = WD.spool_m;
   function hud(f) { const th = TL.thread[f], used = th ? th[1] - TL.s_anchor : 0, m = minoXZ(f), w = posAt(S[f]);
-    const d = m && TL.mino_on[f] ? m.distanceTo(w) : Infinity, prox = DETECT < 0 || f < DETECT ? 'SCANNING' : d < 6 ? '<b class="r">DANGER</b>' : d < 14 ? '<b class="a">CAUTION</b>' : 'TRACKING';
+    const d = m && TL.mino_on[f] ? m.distanceTo(w) : Infinity, mst = mstate(f), prox = mst === 'patrol' ? 'PATROLLING' : mst === 'track' ? 'FOLLOWING THREAD' : mst === 'search' || mst === 'lost' ? '<b class="a">SEARCHING</b>' : mst !== 'chase' ? 'SCANNING' : d < 6 ? '<b class="r">DANGER</b>' : d < 14 ? '<b class="a">CAUTION</b>' : 'TRACKING';
     const parts = f >= F.halfShelf ? '1 / 2' : f >= F.pickBox ? '1 / 2 (BOXED)' : '0 / 2';
     const exit = f >= F.layArrow ? 'OPEN' : 'RELOCATED';
     $('rcpt').innerHTML = `<div class="hd">BUREAU &amp; CO.</div><div class="sl">HOME, ADMINISTERED.</div><hr>
@@ -412,7 +487,7 @@ async function sceneMain(THREE, X) {
     for (const [cx, cz] of [[fx0, fz0], [fx0 + fw, fz0], [fx0, fz0 + fh], [fx0 + fw, fz0 + fh]]) { g.fillStyle = C.copper; g.fillRect(cx - 7, cz - 7, 14, 14); g.fillStyle = C.bg; g.fillRect(cx - 3, cz - 3, 6, 6); }
     return c; };
   const v3w = new THREE.Vector3(), mapLog = {};
-  function drawMap(f, mode) { if (!mode) { mapC.style.display = 'none'; return; } mapC.style.display = 'block'; scene.updateMatrixWorld(true);
+  function drawMap(f, mode) { if (!mode) { mapC.style.display = 'none'; return; } mapC.style.display = 'block'; mapC.style.opacity = mode === 'full' ? MAPFADE[f].toFixed(3) : '1'; scene.updateMatrixWorld(true);
     if (mapStaticMode !== mode) { mapStatic = drawStatic(mode); mapStaticMode = mode; } const P = mapProj(mode); mx.clearRect(0, 0, W, H); mx.drawImage(mapStatic, 0, 0);
     // doors: drawn from the live leaf transforms
     for (const D of DOORS) { const o = TL.door_open[D.di][f], hw = D.d.w / 2; mx.strokeStyle = o < 0.02 ? C.copper : C.mustard; mx.lineWidth = Math.max(3, P.sc * 0.22); mx.lineCap = 'round';
@@ -421,14 +496,23 @@ async function sceneMain(THREE, X) {
     // thread: the same route samples and side offset as the 3D ribbon
     const th = TL.thread[f]; if (th) { mx.save(); mx.strokeStyle = C.amber; mx.lineWidth = Math.max(2.5, P.sc * 0.2); mx.shadowColor = C.amber; mx.shadowBlur = 10; mx.lineJoin = 'round'; mx.beginPath();
       for (let s = th[0], i = 0; s <= th[1] + 1e-6; s += 0.25, i++) { const p = posAt(Math.min(s, th[1])), t = headAt(Math.min(s, th[1])), x = p.x - t.z * 0.18, z = p.z + t.x * 0.18; i ? mx.lineTo(P.x(x), P.z(z)) : mx.moveTo(P.x(x), P.z(z)); } mx.stroke(); mx.restore(); }
-    // trolley footprint from the trolley object matrix
-    if (trolley.visible) { mx.fillStyle = '#9aa3aa'; mx.beginPath(); [[-0.31, -0.475], [0.31, -0.475], [0.31, 0.475], [-0.31, 0.475]].forEach(([x, z], i) => { const q = trolley.localToWorld(v3w.set(x, 0, z)); i ? mx.lineTo(P.x(q.x), P.z(q.z)) : mx.moveTo(P.x(q.x), P.z(q.z)); }); mx.closePath(); mx.fill(); }
+    // trolley footprint from the trolley transform (the 3D trolley is hidden while the drawn push-rig cart stands in for it)
+    const P_ = trolley.position; if (trolley.visible || pushRig.root.visible) { mx.fillStyle = '#9aa3aa'; mx.beginPath(); [[-0.31, -0.475], [0.31, -0.475], [0.31, 0.475], [-0.31, 0.475]].forEach(([x, z], i) => { const q = trolley.localToWorld(v3w.set(x, 0, z)); i ? mx.lineTo(P.x(q.x), P.z(q.z)) : mx.moveTo(P.x(q.x), P.z(q.z)); }); mx.closePath(); mx.fill(); }
     // MINO: occluded fan from the same rays as the 3D fan, bull-headed polisher icon
     if (mino.visible || (TL.mino_on[f] && minoXZ(f))) { const mp = mino.position; if (FANPTS.length) { mx.fillStyle = 'rgba(255,51,36,0.28)'; mx.beginPath(); mx.moveTo(P.x(mp.x), P.z(mp.z)); FANPTS.forEach(([x, z]) => mx.lineTo(P.x(x), P.z(z))); mx.closePath(); mx.fill(); }
       const r = Math.max(9, P.sc * 0.75), cx = P.x(mp.x), cz = P.z(mp.z), yw = mino.rotation.y; mx.save(); mx.translate(cx, cz); mx.rotate(-yw);
       mx.fillStyle = '#2b2f34'; mx.strokeStyle = C.ink; mx.lineWidth = 2; mx.beginPath(); mx.arc(0, 0, r, 0, 7); mx.fill(); mx.stroke();
       mx.strokeStyle = C.ink; mx.lineWidth = Math.max(2, r * 0.22); mx.beginPath(); mx.moveTo(-r * 0.55, r * 0.55); mx.quadraticCurveTo(-r * 1.25, r * 0.9, -r * 1.05, r * 1.55); mx.moveTo(r * 0.55, r * 0.55); mx.quadraticCurveTo(r * 1.25, r * 0.9, r * 1.05, r * 1.55); mx.stroke();
       mx.fillStyle = C.red; mx.shadowColor = C.red; mx.shadowBlur = 12; mx.beginPath(); mx.arc(0, r * 0.45, r * 0.28, 0, 7); mx.fill(); mx.restore(); }
+    if (MAPCHK[f] === 3) { const g0 = TEL.find(t => /MAP_CHECKIN_3/.test(String(t.special_events))).frame, k = f - g0;
+      // real MINO: docked, drawn at the closet from world.json (it has not been revealed; mino_on is 0)
+      const cx_ = P.x(WD.closet[0]), cz_ = P.z(WD.closet[1]); mx.fillStyle = '#5a5f66'; mx.beginPath(); mx.arc(cx_, cz_, Math.max(7, P.sc * 0.55), 0, 7); mx.fill(); mx.fillStyle = C.ink; mx.font = `700 ${Math.max(10, P.sc * 0.7)}px "DejaVu Sans Mono"`; mx.textAlign = 'center'; mx.fillText('MINO: DOCKED', cx_, cz_ - P.sc * 1.1);
+      if (k >= 40 && k < 130) { const A0 = [2, -15], B0 = [12, -15], u = clamp((k - 40) / 60, 0, 1), bx = P.x(A0[0] + (B0[0] - A0[0]) * u), bz = P.z(A0[1]), rec = clamp((k - 100) / 30, 0, 1);
+        mx.save(); mx.globalAlpha = 1 - rec; mx.setLineDash([5, 4]); mx.strokeStyle = C.red; mx.lineWidth = 2; mx.beginPath(); mx.arc(bx, bz, Math.max(9, P.sc * 0.75), 0, 7); mx.stroke(); mx.setLineDash([]);
+        if ((k >> 3) % 2 === 0) { mx.fillStyle = C.red; mx.font = `800 ${Math.max(12, P.sc * 0.85)}px "DejaVu Sans Mono"`; mx.textAlign = 'center'; mx.fillText('TRACKING ERROR', bx, bz - P.sc * 1.3); }
+        if (rec > 0) { mx.globalAlpha = rec; mx.strokeStyle = C.ink; mx.setLineDash([2, 5]); mx.beginPath(); mx.moveTo(bx, bz); mx.lineTo(cx_, cz_); mx.stroke(); }
+        mx.restore(); if (k >= 100) { mx.fillStyle = C.mustard; mx.font = `700 ${Math.max(11, P.sc * 0.75)}px "DejaVu Sans Mono"`; mx.textAlign = 'center'; mx.fillText('RECONCILED: SIGNAL WAS NOT MINO', P.x(7), P.z(-12.5)); } }
+      mapLog.glitch = mapLog.glitch || []; if (k >= 40 && k < 130) mapLog.glitch.push(f); }
     // Wolfgang: portrait marker at the live wolf position
     const wp = wolf.position, R = Math.max(16, P.sc * 0.95), wx = P.x(wp.x), wz = P.z(wp.z);
     mx.save(); mx.translate(wx, wz); mx.rotate(-wolf.rotation.y); mx.fillStyle = C.copper; mx.beginPath(); mx.moveTo(0, R * 1.45); mx.lineTo(-R * 0.35, R * 0.95); mx.lineTo(R * 0.35, R * 0.95); mx.fill(); mx.restore();
@@ -441,7 +525,7 @@ async function sceneMain(THREE, X) {
     mx.textAlign = 'right'; mx.fillStyle = C.ink; mx.font = `700 ${22 * us}px "DejaVu Sans Mono"`; const right = mode === 'full' ? 0.96 * W : 0.985 * W;
     mx.fillText(`ZONE  ${zn ? (zoneLabel[zn.id] || zn.id).toUpperCase() : 'UNMAPPED'}`, right, top + 30 * us); mx.fillStyle = C.amber; mx.fillText(`THREAD  ${used.toFixed(1)} M`, right, top + 58 * us);
     mapLog[f] = { mode, wolf3d: [+wp.x.toFixed(4), +wp.z.toFixed(4)], wolfPx: [+wx.toFixed(2), +wz.toFixed(2)], mino3d: mino.visible ? [+mino.position.x.toFixed(4), +mino.position.z.toFixed(4)] : null,
-      proj: { sc: P.sc, ox: P.ox, oy: P.oy, x0: MAPB.x0, z0: MAPB.z0 }, trolley: trolley.visible ? [+trolley.position.x.toFixed(4), +trolley.position.z.toFixed(4)] : null, thread: th || null }; }
+      proj: { sc: P.sc, ox: P.ox, oy: P.oy, x0: MAPB.x0, z0: MAPB.z0 }, trolley: (trolley.visible || pushRig.root.visible) ? [+(P_.x).toFixed(4), +(P_.z).toFixed(4)] : null, thread: th || null }; }
   window.mapLog = mapLog;
   // ---------------------------------------------------------------- comparison render (bake validation): baked solids + plain floor only, fixed bake camera, no tone mapping / post
   window.renderCompare = () => { scene.traverse(o => { o.visible = false; }); const show = o => { o.traverse(c => { c.visible = true; }); let p = o.parent; while (p) { p.visible = true; p = p.parent; } };
@@ -468,12 +552,12 @@ async function sceneMain(THREE, X) {
     trolley.userData.box.visible = f >= F.pickBox && f < F.door; bag.visible = f >= F.door;
     // MINO
     const m = minoXZ(f), on = m && TL.mino_on[f]; mino.visible = !!on; warnRing.visible = !!on; trail.m.visible = !!on; fanPivot.visible = !!on;
-    if (on) { const k = f - F.minoReveal; let mh; if (k < WD.emerge_frames) { const m2 = minoXZ(f + 1) || m; mh = m2.clone().sub(m); if (mh.lengthSq() < 1e-6) mh = V3(0, 0, 1); mh.normalize(); } else mh = headAt(SM[f]);
+    if (on) { const k = f - F.minoReveal; let mh; if (k < WD.emerge_frames) { const m2 = minoXZ(f + 1) || m; mh = m2.clone().sub(m); if (mh.lengthSq() < 1e-6) mh = V3(0, 0, 1); mh.normalize(); } else mh = V3(Math.sin(TL.mino_yaw[f]), 0, Math.cos(TL.mino_yaw[f]));
       mino.position.copy(m); mino.rotation.y = Math.atan2(mh.x, mh.z); brushes.forEach((b, i) => b.rotation.y = f * 0.6 * (i ? -1 : 1));
-      const d = m.distanceTo(P), alert = DETECT >= 0 && f >= DETECT ? clamp((16 - d) / 8, 0.35, 1) : 0; fanPivot.position.set(m.x, 0.04, m.z); fanPivot.rotation.y = SENS[f]; updateFan(m, SENS[f], f); fan.material.opacity = DETECT >= 0 && f >= DETECT ? 0.3 : 0.18 + 0.06 * Math.sin(f * 0.4);
+      const d = m.distanceTo(P), mst = mstate(f), alert = mst === 'chase' ? clamp((16 - d) / 8, 0.35, 1) : mst === 'search' || mst === 'lost' ? 0.3 : 0; fanPivot.position.set(m.x, 0.04, m.z); fanPivot.rotation.y = SENS[f]; updateFan(m, SENS[f], f); fan.material.opacity = mst === 'chase' ? 0.3 : mst === 'search' ? 0.24 : 0.16 + 0.05 * Math.sin(f * 0.4);
       sensorLight.target.position.set(Math.sin(SENS[f] - mino.rotation.y) * 6, 0, Math.cos(SENS[f] - mino.rotation.y) * 6); warnRing.position.set(m.x, 0.05, m.z); warnRing.material.opacity = alert * (0.55 + 0.45 * Math.sin(f * 0.5));
       warnRing.scale.setScalar(1 + 0.25 * Math.sin(f * 0.25)); sensorLight.intensity = 20 + 25 * alert;
-      if (k >= WD.emerge_frames) setRibbon(trail, Math.max(0, SM[f] - 14), SM[f] - 0.5, 0.95, 0.012); else trail.m.visible = false; }
+      if (k >= WD.emerge_frames) { let a = SM[f], b = SM[f]; for (let q = Math.max(F.minoReveal + WD.emerge_frames, f - 150); q <= f; q++) { a = Math.min(a, SM[q]); b = Math.max(b, SM[q]); } setRibbon(trail, Math.max(0, a), b, 0.95, 0.012); } else trail.m.visible = false; }
     wBlob.position.set(P.x, 0.012, P.z); tBlob.visible = BAKE && trolley.visible; tBlob.position.set(trolley.position.x, 0.013, trolley.position.z); tBlob.rotation.y = trolley.rotation.y;
     mBlob.visible = BAKE && !!on; if (on) { mBlob.position.set(m.x, 0.014, m.z); mBlob.rotation.y = mino.rotation.y; }
     // thread
@@ -484,12 +568,44 @@ async function sceneMain(THREE, X) {
     document.body.style.setProperty('--gl', gl.toFixed(3)); $('glitch').style.opacity = gl;
     // camera
     const c = camAt(f); CEIL.forEach(o => o.visible = c.pos.y > 40); camera.position.copy(c.pos); camera.lookAt(c.look); camera.fov = c.fov; camera.near = c.near || 0.5; if (QA) camera.setViewOffset(W, H, W * 0.21, 0, W, H); camera.updateProjectionMatrix();   /* QA: subject framed in the left 58%, map panel on the right */
-    const fp1 = c.shot === 'w1'; head.visible = !fp1; body.visible = !fp1; tails.visible = !fp1; if (fp1 && bag.visible) { bag.position.set(0, 1.0, 0.55); bag.rotation.x = -0.5; } else { bag.position.set(-0.36, 0.6, 0); bag.rotation.x = 0; } mino.visible = mino.visible && c.shot !== 'm1'; fanPivot.visible = fanPivot.visible && c.shot !== 'm1';
+    const fp1 = c.shot === 'w1'; /* v10e: placeholder meshes stay hidden; the sprite handles first person */ bag.visible = false;   /* no approved carry pose: flatpack bag withheld (gap) */ if (fp1 && bag.visible) { bag.position.set(0, 1.0, 0.55); bag.rotation.x = -0.5; } else { bag.position.set(-0.36, 0.6, 0); bag.rotation.x = 0; } mino.visible = mino.visible && c.shot !== 'm1'; fanPivot.visible = fanPivot.visible && c.shot !== 'm1';
+    { const H_ = (TL.holds || [])[0]; if (H_ && !QA && !Q.get('qacam') && f >= H_.stop[0] - 10 && f < H_.stop[1] + 15) {   // O1 door wait: locked side camera, door and Wolfgang both in frame
+        if (!H_.cam) { const fs = H_.stop[0], Pw0 = posAt(S[fs]), y0 = TL.yaw[fs], fw = V3(Math.sin(y0), 0, Math.cos(y0)), sideV = V3(-fw.z, 0, fw.x); let best = null;
+          for (const sg of [1, -1]) { const d0 = rayLen(Pw0.x, Pw0.z, Math.atan2(sideV.x * sg, sideV.z * sg), 4.5, fs); if (!best || d0 > best.d) best = { sg, d: d0 }; }
+          const dist = Math.min(3.6, best.d - 0.4), cpos = Pw0.clone().addScaledVector(sideV, best.sg * dist).addScaledVector(fw, -0.6).setY(1.45), look = Pw0.clone().addScaledVector(fw, 1.1).setY(1.05);
+          H_.cam = { cpos, look }; }
+        camera.position.copy(H_.cam.cpos); camera.lookAt(H_.cam.look); camera.fov = 46; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true); } }
+    if (Q.get('qacam')) { const [ang, dist, hh, lh] = Q.get('qacam').split(',').map(Number), A_ = yaw + ang * Math.PI / 180, Pq = wolf.position;     // QA review camera: angle from his facing, distance, height, look height
+      camera.position.set(Pq.x + Math.sin(A_) * dist, hh, Pq.z + Math.cos(A_) * dist); camera.lookAt(Pq.x, lh, Pq.z); camera.fov = +(Q.get('qafov') || 40); camera.updateProjectionMatrix(); camera.updateMatrixWorld(true); }
+    { // ---- v10e Wolfgang sprite pose (camera-relative view selection; distance-driven walk; idle when stopped; side push rig)
+      const fp = c.shot === 'w1', cp = camera.position, Pw = wolf.position, spd = Math.abs(S[f] - S[Math.max(0, f - 1)]) * FPS, idle = spd < 0.12;
+      const camAng = Math.atan2(cp.x - Pw.x, cp.z - Pw.z); let rel = yaw - camAng; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), hv = V3(Math.sin(yaw), 0, Math.cos(yaw)), goesRight = hv.dot(right) >= 0;
+      const view = Math.abs(rel) < 0.87 ? 'front' : Math.abs(rel) > 2.27 ? 'back' : 'side';
+      const elev = Math.atan2(cp.y - 1.0, Math.hypot(cp.x - Pw.x, cp.z - Pw.z)), tilt = clamp((elev - 0.35) * 0.8, 0, 0.95);
+      const pushing = hasTrolley && view === 'side';   /* side view with trolley: push rig, hands on the handle; amp 0 when stopped (no walking in place) */
+      sprGroup.visible = !fp && !pushing; pushRig.root.visible = !fp && pushing; WSTAT.frames++;
+      const L_ = Math.min(1, irrAt(Pw.x, Pw.z)) * 0.92, tintC = new THREE.Color(L_, L_, L_ * 1.02); sprMat.color.copy(tintC); pushRig.tint(tintC);
+      if (pushing) { WSTAT.push_rig++; pushRig.mirror = !goesRight; pushRig.root.position.copy(P).addScaledVector(h, 0.95 - CART_AHEAD); pushRig.root.rotation.set(0, camAng, 0); pushRig.tilt.rotation.x = -tilt;
+        pushRig.pose(((S[f] / 1.5) % 1 + 1) % 1, idle ? 0 : clamp(spd / 1.4, 0, 1)); if (idle) WSTAT.idle++; trolley.visible = false; if (!goesRight) WSTAT.side_mirrored++; }
+      else { sprGroup.position.copy(Pw); sprGroup.rotation.set(0, camAng, 0); sprTilt.rotation.x = -tilt;
+        const ph = ((S[f] / 1.5) % 1 + 1) % 1, wf = Math.min(5, Math.floor(ph * 6));
+        if (idle) { WSTAT.idle++; if (view === 'back') setFrame('walk_back', 0, false); else if ((view === 'side' ? goesRight : rel < 0)) setFrame('actions2b', 6, false); else setFrame('actions2b', 2, false); }
+        else if (view === 'front') { WSTAT.front++; setFrame('walk_front', wf, false); }
+        else if (view === 'back') { WSTAT.back++; setFrame('walk_back', wf, false); }
+        else { WSTAT.side++; if (!goesRight) WSTAT.side_mirrored++; setFrame('walk_side', wf, !goesRight); }
+        if (hasTrolley && !idle && view !== 'side') WSTAT.push_front_back_no_contact++; }
+      // thread rises from its floor end to the belt anchor (hip height, 6 cm toward the camera so it reads in front of the coat)
+      const thr = TL.thread[f]; belt.visible = !!thr && !fp && thread.m.visible;
+      if (belt.visible) { const e = posAt(thr[1]), tt = headAt(thr[1]), ex = e.x - tt.z * 0.18, ez = e.z + tt.x * 0.18, toC = V3(cp.x - Pw.x, 0, cp.z - Pw.z).normalize();
+        const rh = V3(-hv.z, 0, hv.x), top = V3(Pw.x - rh.x * 0.26 + toC.x * 0.04, 0.9, Pw.z - rh.z * 0.26 + toC.z * 0.04),   /* spool clipped on his right hip */ bot = V3(ex, 0.022, ez), mid = top.clone().add(bot).multiplyScalar(0.5), len = top.distanceTo(bot);
+        belt.position.copy(mid); belt.scale.set(1, len, 1); belt.quaternion.setFromUnitVectors(V3(0, 1, 0), top.clone().sub(bot).normalize()); }
+      window.wolfPose = { view, idle, pushing, mirrored: pushing ? !goesRight : (view === 'side' && !goesRight && !idle), tilt: +tilt.toFixed(3) }; }
     $('minopov').style.display = c.shot === 'm1' ? 'block' : 'none'; $('shot').textContent = DEBUG ? c.shot : '';
     if (c.shot === 'black') { renderer.setClearColor(0x000000, 1); renderer.clear(); hud(f); drawMap(f, ''); $('rcpt').style.display = 'none'; return true; } else $('rcpt').style.display = '';
     sun.position.copy(c.look).add(BAKE ? V3(-3, 40, 4) : V3(-14, 40, 18)); sun.target.position.copy(c.look); sun.castShadow = !BAKE; const ext = f >= F.ext; hemi.intensity = ext ? 0.55 : BAKE ? 0.85 : 1.15; if (BAKE) sun.intensity = 1.1; scene.background.setHex(ext ? 0x0a0e16 : 0x101418);
-    hud(f); drawMap(f, QA ? 'inset' : c.shot === 'map' ? 'full' : ''); if (c.shot === 'map' && !QA) $('rcpt').style.display = 'none';
-    if (DEBUG) $('debug').textContent += `\nLIGHT  ${BAKE ? 'BAKED v2 (Cycles irradiance x albedo); actors live-lit; contact shadows = blob approx' : 'LIVE grey-block'}\nDOOR   ${DOORS.map(D => { const o = TL.door_open[D.di][f], p = TL.door_open[D.di][Math.max(0, f - 1)]; return o > 0.001 || p > 0.001 ? D.d.id + ':' + (o >= 0.999 ? 'OPEN' : o <= 0.001 ? 'CLOSED' : o > p ? 'OPENING' : 'CLOSING') : ''; }).filter(Boolean).join(' ') || 'all closed'}\nMINO LOS ${window.losAt(f) === null ? '-' : window.losAt(f) ? 'CLEAR' : 'BLOCKED'}  DETECT@${DETECT}`;
+    hud(f); drawMap(f, QA ? 'inset' : (c.shot === 'map' && !Q.get('qacam')) ? 'full' : ''); if (c.shot === 'map' && !QA) $('rcpt').style.display = 'none';
+    if (DEBUG) $('debug').textContent += `\nLIGHT  ${BAKE ? 'BAKED v2 (Cycles irradiance x albedo); actors live-lit; contact shadows = blob approx' : 'LIVE grey-block'}\nDOOR   ${DOORS.map(D => { const o = TL.door_open[D.di][f], p = TL.door_open[D.di][Math.max(0, f - 1)]; return o > 0.001 || p > 0.001 ? D.d.id + ':' + (o >= 0.999 ? 'OPEN' : o <= 0.001 ? 'CLOSED' : o > p ? 'OPENING' : 'CLOSING') : ''; }).filter(Boolean).join(' ') || 'all closed'}\nMINO LOS ${window.losAt(f) === null ? '-' : window.losAt(f) ? 'CLEAR' : 'BLOCKED'}  STATE ${TL.mino_on[f] ? mstate(f).toUpperCase() : 'OFF'}  LAST-SEEN s=${TL.mino_last_seen ? TL.mino_last_seen[f] : '-'}\nWOLF   ${window.wolfPose ? window.wolfPose.view + (window.wolfPose.pushing ? ' PUSH-RIG' : '') + (window.wolfPose.idle ? ' IDLE' : '') + (window.wolfPose.mirrored ? ' MIRRORED' : '') : '-'}  (sprite atlas, 2.5D)`;
     grain.uniforms.uT.value = (f % 97) * 1.37; composer.render(); return true; };
   window.exportTelemetry = r => ({ track_name: M.track_name, bpm: M.bpm, resolution_target: r, total_frames_at_30fps: N, telemetry: M.telemetry });
   window.engineReport = { engine: 'v10-bureau-greyblock', frames: N, route_m: +LEN.toFixed(1), doors: WD.doors.length, solids: WD.solids.length };

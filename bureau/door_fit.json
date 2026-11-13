@@ -14,7 +14,7 @@
    {
     "hinge": -1,
     "dir": -1,
-    "conflicts": 15
+    "conflicts": 31
    },
    {
     "hinge": 1,
@@ -24,7 +24,7 @@
    {
     "hinge": 1,
     "dir": -1,
-    "conflicts": 0
+    "conflicts": 8
    }
   ]
  },
@@ -77,7 +77,7 @@
    {
     "hinge": 1,
     "dir": 1,
-    "conflicts": 81
+    "conflicts": 491
    },
    {
     "hinge": 1,
@@ -96,7 +96,7 @@
    {
     "hinge": -1,
     "dir": 1,
-    "conflicts": 1
+    "conflicts": 10
    },
    {
     "hinge": -1,

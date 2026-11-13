@@ -1,0 +1,106 @@
+[
+ {
+  "shot": "map_checkin3_glitch",
+  "frames": 100,
+  "render_wall_s": 188.7,
+  "fps_2workers": 0.53,
+  "capture_ms_median_per_worker": 1152,
+  "capture_ms_p95": 1258,
+  "encode_wall_s": 1.1,
+  "png_frames_mb": 17,
+  "mkv_mb": 0.2,
+  "video": {
+   "codec_name": "h264",
+   "width": 1920,
+   "height": 1080,
+   "pix_fmt": "yuv420p",
+   "color_space": "bt709",
+   "color_transfer": "bt709",
+   "color_primaries": "bt709",
+   "r_frame_rate": "30/1"
+  },
+  "audio": {
+   "codec_name": "aac",
+   "sample_rate": "48000",
+   "r_frame_rate": "0/0"
+  }
+ },
+ {
+  "shot": "mino_chase_wardrobes",
+  "frames": 100,
+  "render_wall_s": 85.2,
+  "fps_2workers": 1.17,
+  "capture_ms_median_per_worker": 1481,
+  "capture_ms_p95": 2349,
+  "encode_wall_s": 5.7,
+  "png_frames_mb": 366,
+  "mkv_mb": 29.9,
+  "video": {
+   "codec_name": "h264",
+   "width": 1920,
+   "height": 1080,
+   "pix_fmt": "yuv420p",
+   "color_space": "bt709",
+   "color_transfer": "bt709",
+   "color_primaries": "bt709",
+   "r_frame_rate": "30/1"
+  },
+  "audio": {
+   "codec_name": "aac",
+   "sample_rate": "48000",
+   "r_frame_rate": "0/0"
+  }
+ },
+ {
+  "shot": "dense_core",
+  "frames": 100,
+  "render_wall_s": 78.3,
+  "fps_2workers": 1.28,
+  "capture_ms_median_per_worker": 1267,
+  "capture_ms_p95": 1982,
+  "encode_wall_s": 5.6,
+  "png_frames_mb": 329,
+  "mkv_mb": 22.8,
+  "video": {
+   "codec_name": "h264",
+   "width": 1920,
+   "height": 1080,
+   "pix_fmt": "yuv420p",
+   "color_space": "bt709",
+   "color_transfer": "bt709",
+   "color_primaries": "bt709",
+   "r_frame_rate": "30/1"
+  },
+  "audio": {
+   "codec_name": "aac",
+   "sample_rate": "48000",
+   "r_frame_rate": "0/0"
+  }
+ },
+ {
+  "shot": "checkin5_map_to_rise",
+  "frames": 100,
+  "render_wall_s": 78.9,
+  "fps_2workers": 1.27,
+  "capture_ms_median_per_worker": 1338,
+  "capture_ms_p95": 2199,
+  "encode_wall_s": 4.1,
+  "png_frames_mb": 230,
+  "mkv_mb": 22.6,
+  "video": {
+   "codec_name": "h264",
+   "width": 1920,
+   "height": 1080,
+   "pix_fmt": "yuv420p",
+   "color_space": "bt709",
+   "color_transfer": "bt709",
+   "color_primaries": "bt709",
+   "r_frame_rate": "30/1"
+  },
+  "audio": {
+   "codec_name": "aac",
+   "sample_rate": "48000",
+   "r_frame_rate": "0/0"
+  }
+ }
+]

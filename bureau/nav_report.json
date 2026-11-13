@@ -63,6 +63,32 @@
    "f1": 1697
   }
  ],
+ "holds": [
+  {
+   "door": "ward_serv",
+   "s_door": 210.76,
+   "s_stop": 208.76,
+   "window": [
+    3722,
+    3933
+   ],
+   "stop": [
+    3811,
+    3843
+   ],
+   "notice": 6,
+   "vmax_window_mps": 4.6
+  }
+ ],
+ "mino_behaviour": {
+  "chase": 471,
+  "lost": 167,
+  "search": 239,
+  "patrol": 1340,
+  "track": 955,
+  "reacquired": 6,
+  "gave_up": 2
+ },
  "min_clearance_m": 0.794,
  "wolfgang_hits": [],
  "trolley_hits": [],

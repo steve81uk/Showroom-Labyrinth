@@ -1,0 +1,151 @@
+{
+ "tool": "bureau_validate.js v10d",
+ "range": {
+  "startFrame": 3650,
+  "endFrame": 3950,
+  "convention": "start inclusive, end exclusive"
+ },
+ "fps": 30,
+ "substeps_per_frame": 4,
+ "shapes": {
+  "wolfgang_circle_m": 0.42,
+  "trolley_obb_m": [
+   0.62,
+   0.95
+  ],
+  "trolley_ahead_m": 0.95,
+  "mino_circle_m": 0.62,
+  "thread_radius_m": 0.03,
+  "thread_side_offset_m": -0.18,
+  "swing_leaf": "panel w x 0.06, hinge -w/2, sweep 0..85.5 deg",
+  "sliding_leaf": "w/2 x 0.08 pane"
+ },
+ "min_clearance_wolfgang_m": 0.406,
+ "hits": {
+  "wolfgang_obstacle": [],
+  "trolley_obstacle": [],
+  "mino_obstacle": [],
+  "thread_obstacle": [],
+  "wolfgang_door_leaf": [],
+  "trolley_door_leaf": [],
+  "mino_door_leaf": [],
+  "thread_door_leaf": [],
+  "door_leaf_vs_structure": []
+ },
+ "door_states": [
+  {
+   "id": "ward_serv",
+   "kind": "swing",
+   "staff": false,
+   "events": [
+    [
+     3650,
+     "closed"
+    ],
+    [
+     3817,
+     "opening"
+    ],
+    [
+     3827,
+     "open"
+    ]
+   ]
+  },
+  {
+   "id": "kit_hall",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     3650,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "hall_ward",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     3650,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  }
+ ],
+ "door_approach": [
+  {
+   "door": "ward_serv",
+   "kind": "swing",
+   "crossing_frame": 3870,
+   "opening_starts": 3817,
+   "fully_open": 3827,
+   "open_lead_frames": 43,
+   "min_speed_mps_while_opening": 0,
+   "waited": true
+  }
+ ],
+ "mino_line_of_sight": {
+  "frames_clear": 16,
+  "frames_blocked": 284
+ },
+ "mino_behaviour": {
+  "frames_by_state": {
+   "lost": 33,
+   "search": 120,
+   "patrol": 83,
+   "track": 64
+  },
+  "violations": {
+   "chase_without_recent_los": [],
+   "lost_search_beyond_last_seen": [],
+   "last_seen_updated_without_los": [],
+   "speed_over_3mps": []
+  },
+  "pass": true
+ },
+ "holds": [
+  {
+   "door": "ward_serv",
+   "s_door": 210.76,
+   "s_stop": 208.76,
+   "window": [
+    3722,
+    3933
+   ],
+   "stop": [
+    3811,
+    3843
+   ],
+   "notice": 6,
+   "vmax_window_mps": 4.6
+  }
+ ],
+ "map_correspondence": {
+  "frames": 90,
+  "max_wolf_world_err_m": 0.00006,
+  "max_wolf_marker_err_px": 0.006,
+  "max_mino_world_err_m": 0.00006,
+  "max_trolley_world_err_m": 0.00006,
+  "pass": true
+ },
+ "pass": true
+}

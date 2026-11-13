@@ -8,3 +8,12 @@ assets/*.png
 props/
 scene_background.png
 *.hdr
+# private production assets: kept out of this PUBLIC repo until a private backup destination is approved
+audio_master.wav
+manifest.json
+Master_Sprite_Atlas.png
+Master_Normal_Atlas.png
+atlas_map.json
+scene_background.png
+docs/wolfgang_atlas_*.jpg
+*_raw.exr
