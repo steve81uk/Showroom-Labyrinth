@@ -1,0 +1,11 @@
+{
+ "res": 2048,
+ "spp": 64,
+ "faces": 511,
+ "times": {
+  "diffuse": 216.2,
+  "ao": 128.5,
+  "verify_frame": 0.3,
+  "total": 345.5
+ }
+}

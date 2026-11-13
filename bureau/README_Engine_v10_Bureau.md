@@ -110,3 +110,7 @@ bpy 5.3.0 headless in the sandbox (2 CPU cores, no GPU), one 960x540 overhead fr
 | Three.js v10 + bloom | ~0.35 | ~35 min |
 
 Decision: Blender is the asset and lighting tool, not the frame renderer. Plan: bake Cycles GI + AO lightmaps for the static store once, export glTF with lightmaps, render animation in Three.js. Contact sheet: `docs/blender_bench_sheet.jpg`.
+
+## Lightmap bake v1 (2026-11-13)
+`blender_bake.py <track_root> [res] [spp]`: whole static store (511 faces) as one mesh, lightmap UVs on channel 2, Cycles DIFFUSE (direct+indirect) and AO baked. 2048 px / 64 spp: 216 s + 129 s = 5.8 min total for the entire store. Outputs in `bureau/bake/`: `bureau_store.glb` (TEXCOORD_0 + TEXCOORD_1), `lightmap_diffuse.jpg`, `lightmap_ao.jpg`. Verification render (unlit, base colour x lightmap) = 0.3 s/frame: `docs/bake_v1_sheet.jpg`.
+Next: load the glb in bureau_scene.js, `material.lightMap` with `lightMap.channel = 1`, drop the static directional shadow pass; moving actors keep real-time light.
