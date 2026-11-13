@@ -1,0 +1,59 @@
+{
+ "route_m": 409.1,
+ "legs": [
+  {
+   "label": "entrance",
+   "len": 25,
+   "s1": 25
+  },
+  {
+   "label": "to the display bed",
+   "len": 11.9,
+   "s1": 36.9
+  },
+  {
+   "label": "bedrooms, kitchens, exit hall, wardrobes",
+   "len": 132.8,
+   "s1": 169.8
+  },
+  {
+   "label": "MINO wakes; into service",
+   "len": 30.9,
+   "s1": 200.7
+  },
+  {
+   "label": "service corridors",
+   "len": 41.8,
+   "s1": 242.5
+  },
+  {
+   "label": "the maze core",
+   "len": 138.2,
+   "s1": 380.7
+  },
+  {
+   "label": "exit hall",
+   "len": 14.9,
+   "s1": 395.6
+  },
+  {
+   "label": "car park",
+   "len": 13.5,
+   "s1": 409.1
+  }
+ ],
+ "leg_speed_scale": [
+  0.873,
+  1.206,
+  0.998,
+  1.092,
+  0.869
+ ],
+ "min_clearance_m": 0.794,
+ "wolfgang_hits": [],
+ "trolley_hits": [],
+ "mino_hits": [],
+ "thread_hits": [],
+ "closed_door_crossings": [],
+ "pass": true
+}
