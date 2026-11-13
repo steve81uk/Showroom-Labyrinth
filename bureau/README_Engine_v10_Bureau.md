@@ -72,6 +72,27 @@ Walk-speed scale per leg: 0.87, 1.21, 1.00, 1.09, 0.87.
   - film grain and vignette.
 - **Test strip:** frames 1600 to 1900 (glitch, wrong turn, pivot).
 
+## v10c: lyric storytelling, cameras, outfits
+
+- **Lyric set dressing** (`lyric_dressing.js`, 55 items keyed to sung lines, never to frames):
+  - Every "Follow the yellow" gets its own FOLLOW THE YELLOW sign where he is when it's sung.
+  - Further items: the 9:45 clock and FREE PENCILS, "<- BEDROOMS" / "BEDROOMS ->" (left at the bedroom, right at the same one), the family portrait, the SHORTCUT curtain, the four-poster that takes flight, laid tables, the fake window, the crooked chair, flat-pack on the floor, Kitchen No. 7 with the stone loaf, the phone with no dialling tone, price-tag flip signs, LIFETIME GUARANTEE*, the kettle with yesterday's stain, and the MPV blinking for "car keys in my hand".
+  - Props are placed after the route is solved and pass the same collision gate.
+- **Signs readable from all angles:** hanging A-frame lightboxes with two printed faces, set across the aisle above the wall tops, lit on their line and then dimming.
+- **Camera director:** the manifest camera_mode is the intent, and the overhead floor plan stays the anchor (about 55%).
+
+  | Manifest mode | Shot |
+  |---|---|
+  | FPV | Wolfgang 1st person |
+  | SCROLL | 3rd person side tracking |
+  | CHASE_FAST | Cuts on the bar: 2 bars overhead, 1 bar 3rd person, 1 bar behind MINO |
+  | CLOSE | MINO POV (red sensor overlay) |
+  | CHASE_LOW | Low shot behind MINO |
+  | MAP_ORBIT, SCAN | Overhead pans |
+
+  Every ground camera is pulled in along its line of sight so it never enters a wall or prop.
+- **Outfits:** the canon wolf (white or silver fur, cyber eye) plus a wardrobe per video. 'velvet' (Case File) is used here; 'noir' (Dream Eater) is also defined. Override with `&outfit=noir`. References are in `docs/ref_wolfgang_*`.
+
 ## Not yet done (later passes)
 
 - Thread reel-back.

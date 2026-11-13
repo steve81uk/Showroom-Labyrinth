@@ -31,6 +31,7 @@ const F = {
 F.door = Math.min(N - 1, F.layArrow + Math.round(2.2 * FPS));
 F.pre = Math.round((M.sections.find(x => /Pre-Chorus/.test(x.name)) || { start_s: 55.891 }).start_s * FPS);
 F.deadEnd = F.pre;
+{ const l = (M.acoustic.lines || []).find(x => /four-poster took flight/i.test(x.text)); F.fourPoster = l ? Math.round(l.start_s * FPS) : 1519; }
 const SPEED = { walk: 1.45, push_trolley: 1.35, run: 4.4, idle: 0, idle_trolley: 0, freeze: 0, slowmo: 0.7, turn_left: 1.3, turn_right: 1.3,
   look_left: 0.7, look_right: 0.7, look_down: 0.6, tie_thread: 0, step_back: 0 };
 const P = new Float64Array(N); { let v = 0, s = 0; for (let f = 0; f < N; f++) { const tgt = SPEED[TEL[telIdx[f]].sprite_state] ?? 1.2; v += (tgt - v) * 0.12; s += v / FPS; P[f] = s; } }
@@ -261,6 +262,32 @@ DOORS.forEach((d, di) => { let o = 0;
     if (d.id === 'hall_core' && f < F.finalChorus) want = want && f >= F.finalChorus;                                 // core->hall opens only for the escape
     o = Math.max(0, Math.min(1, o + (want ? 1 : -1) / DOOR_T)); doorOpen[di][f] = o; } });
 
+// ---------------------------------------------------------------- lyric set dressing (placed AFTER the route is solved, then collision-tested like everything else)
+const DRESS = [];
+{ const lines = (M.acoustic.lines || []).map(l => ({ text: String(l.text).trim(), f: Math.round(l.start_s * FPS) }));
+  const free = (x0, z0, x1, z1, clear) => { for (const o of SOL) if (!(x1 + 0.12 < o.x0 || x0 - 0.12 > o.x1 || z1 + 0.12 < o.z0 || z0 - 0.12 > o.z1)) return false;
+    for (let k = 0; k < ROUTE.length; k += 2) { const p = ROUTE[k]; const dx = Math.max(x0 - p[0], 0, p[0] - x1), dz = Math.max(z0 - p[1], 0, p[1] - z1); if (dx * dx + dz * dz < clear * clear) return false; } return true; };
+  for (const e of require('./lyric_dressing.js')) {
+    const hits = lines.filter(l => e.line.test(l.text)); const L = hits[e.nth || 0]; if (!L) { console.error('[dress] no line for', e.line); continue; }
+    const f = Math.min(N - 1, L.f), item = { text: e.text, kind: e.kind, f, tone: e.tone || 'teal', big: !!e.big, shape: e.shape || null, anim: e.anim || null, w: e.w, d: e.d || 0.3, h: e.h || 0, tilt: e.tilt || 0, curve: !!e.curve, tile: !!e.tile };
+    const grp = e.group ? DRESS.find(d => d.group === e.group && !d.flipOf && d.flipOf !== 0) : null; item.group = e.group || null;
+    if (grp) { item.x = grp.x; item.z = grp.z; item.yaw = grp.yaw; item.flipOf = DRESS.indexOf(grp); DRESS.push(item); continue; }
+    if (e.fixed) { item.x = e.fixed[0]; item.z = e.fixed[1]; item.yaw = 0; }
+    else { let placed = false; for (const dl of [0, 2, -2, 4, -4, 6]) { const s0 = S[f] + (e.lead || 0) + dl, p = posAtS(s0), t = tanAt(s0), n = [-t[1], t[0]]; item.yaw = Math.atan2(t[0], t[1]);
+      if (e.side !== 'on') { // try both sides, increasing offsets; props must keep 0.95 m from the route and stay out of solids; signs prefer a clear line too
+        const sides = e.side === 'L' ? [1] : e.side === 'R' ? [-1] : [1, -1]; let best = null;
+        for (const off of [1.7, 2.1, 2.5, 3.0, 3.5]) { for (const sd of sides) { const x = p[0] + n[0] * off * sd, z = p[1] + n[1] * off * sd;
+            if (e.kind === 'prop') { const hw = Math.max(e.w, e.d || 0.3) / 2 + 0.05; if (free(x - hw, z - hw, x + hw, z + hw, 0.95 + hw * 0)) { best = [x, z]; break; } }
+            else if (e.kind === 'sign') { const ov = DRESS.some(d => d.kind === 'sign' && d.flipOf === undefined && Math.abs(d.x - x) < (d.w + e.w) / 2 + 0.4 && Math.abs(d.z - z) < 1.6);
+              if (!ov && free(x - 0.2, z - 0.2, x + 0.2, z + 0.2, 1.2)) { best = [x, z]; break; } } }
+          if (best) break; }
+        if (best) { item.x = best[0]; item.z = best[1]; placed = true; break; } } else { item.x = p[0]; item.z = p[1]; placed = true; break; } }
+      if (!placed) { console.error('[dress] no clear spot for', e.text); continue; } }
+    if (e.kind === 'prop') { const hw = (e.shape === 'portrait' || e.shape === 'curtain' || e.shape === 'window') ? null : Math.max(e.w, e.d || 0.3) / 2;
+      const bx = hw === null ? [item.x - e.w / 2, item.z - (e.d || 0.3) / 2, item.x + e.w / 2, item.z + (e.d || 0.3) / 2] : [item.x - hw, item.z - hw, item.x + hw, item.z + hw];
+      SOL.push({ x0: bx[0], z0: bx[1], x1: bx[2], z1: bx[3], h: e.h, kind: 'dress_' + (e.shape || 'prop'), layer: e.h > 0.5 ? 'large' : 'small', dress: DRESS.length }); }
+    if (e.anim === 'fourposter') SOL.push({ x0: item.x - 1.1, z0: item.z - 1.3, x1: item.x + 1.1, z1: item.z + 1.3, h: 2.2, kind: 'dress_fourposter', layer: 'large', dress: DRESS.length });
+    DRESS.push(item); } }
 // ---------------------------------------------------------------- collision test (the acceptance gate)
 const rectHitCircle = (s, x, z, r) => { const dx = Math.max(s.x0 - x, 0, x - s.x1), dz = Math.max(s.z0 - z, 0, z - s.z1); return dx * dx + dz * dz < r * r; };
 const doorRect = d => d.axis === 'x' ? { x0: d.x - d.w / 2, z0: d.z - 0.08, x1: d.x + d.w / 2, z1: d.z + 0.08 } : { x0: d.x - 0.08, z0: d.z - d.w / 2, x1: d.x + 0.08, z1: d.z + d.w / 2 };
@@ -283,7 +310,7 @@ for (let f = 0; f < N; f++) {
     DOORS.forEach((d, di) => { if (rectHitCircle(doorRect(d), p[0], p[1], 0.03) && doorOpen[di][f] < 0.95) report.doors_crossed_closed.push([f, 'thread', d.id]); }); } }
 }
 const uniq = a => { const seen = new Map(); for (const [f, k, ...r] of a) { const key = k + (r[0] || ''); if (!seen.has(key)) seen.set(key, { first: f, last: f, n: 0, what: [k, ...r].join(' ') }); const e = seen.get(key); e.last = f; e.n++; } return [...seen.values()]; };
-const summary = { route_m: +LEN.toFixed(1), legs: LEGINFO.map(L => ({ label: L.label, len: +L.len.toFixed(1), s1: +L.s1.toFixed(1) })), leg_speed_scale: legScale,
+const summary = { dressing_items: DRESS.length, route_m: +LEN.toFixed(1), legs: LEGINFO.map(L => ({ label: L.label, len: +L.len.toFixed(1), s1: +L.s1.toFixed(1) })), leg_speed_scale: legScale,
   pivots: PIVOTS, min_clearance_m: +report.min_clear.toFixed(3), wolfgang_hits: uniq(report.wolfgang), trolley_hits: uniq(report.trolley), mino_hits: uniq(report.mino), thread_hits: uniq(report.thread),
   closed_door_crossings: uniq(report.doors_crossed_closed.map(([f, who, id, o]) => [f, who, id, o])),
   pass: !report.wolfgang.length && !report.trolley.length && !report.mino.length && !report.thread.length && !report.doors_crossed_closed.length };
@@ -291,7 +318,7 @@ fs.writeFileSync(path.join(OUT, 'nav_report.json'), JSON.stringify(summary, null
 
 // ---------------------------------------------------------------- outputs for the renderer
 const sub = (arr, k = 1) => Array.from(arr).map(v => +v.toFixed(3));
-fs.writeFileSync(path.join(OUT, 'world.json'), JSON.stringify({ version: 'v10-greyblock', solids: SOL, doors: DOORS, zones: ZONES, labels: LABELS, route: ROUTE.map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]),
+fs.writeFileSync(path.join(OUT, 'world.json'), JSON.stringify({ version: 'v10-greyblock', dress: DRESS, solids: SOL, doors: DOORS, zones: ZONES, labels: LABELS, route: ROUTE.map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]),
   route_s: sub(SL), legs: LEGINFO.map(({ grid, ...L }) => L), anchor: WP.anchor, closet: CLOSET, emerge: EMERGE, emerge_frames: KJ, wall_h: WH, spool_m: SPOOL }));
 fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify({ F, pivots: PIVOTS, yaw: sub(YAW), S: sub(S), SM: sub(SM), mino_on: Array.from(minoOn), s_anchor: +sAnchor.toFixed(3),
   door_open: doorOpen.map(a => Array.from(a, v => +v.toFixed(3))), thread: Array.from({ length: N }, (_, f) => { const t = threadSpan(f); return t ? [+t[0].toFixed(2), +t[1].toFixed(2)] : 0; }) }));
