@@ -1,0 +1,127 @@
+{
+ "tool": "bureau_validate.js v10d",
+ "range": {
+  "startFrame": 3700,
+  "endFrame": 4000,
+  "convention": "start inclusive, end exclusive"
+ },
+ "fps": 30,
+ "substeps_per_frame": 4,
+ "shapes": {
+  "wolfgang_circle_m": 0.42,
+  "trolley_obb_m": [
+   0.62,
+   0.95
+  ],
+  "trolley_ahead_m": 0.95,
+  "mino_circle_m": 0.62,
+  "thread_radius_m": 0.03,
+  "thread_side_offset_m": -0.18,
+  "swing_leaf": "panel w x 0.06, hinge -w/2, sweep 0..85.5 deg",
+  "sliding_leaf": "w/2 x 0.08 pane"
+ },
+ "min_clearance_wolfgang_m": 0.406,
+ "hits": {
+  "wolfgang_obstacle": [],
+  "trolley_obstacle": [],
+  "mino_obstacle": [],
+  "thread_obstacle": [],
+  "wolfgang_door_leaf": [],
+  "trolley_door_leaf": [],
+  "mino_door_leaf": [],
+  "thread_door_leaf": [],
+  "door_leaf_vs_structure": []
+ },
+ "door_states": [
+  {
+   "id": "ward_serv",
+   "kind": "swing",
+   "staff": false,
+   "events": [
+    [
+     3700,
+     "closed"
+    ],
+    [
+     3782,
+     "opening"
+    ],
+    [
+     3792,
+     "open"
+    ],
+    [
+     3966,
+     "closing"
+    ],
+    [
+     3976,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "kit_hall",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     3700,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "hall_ward",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     3700,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  }
+ ],
+ "door_approach": [
+  {
+   "door": "ward_serv",
+   "kind": "swing",
+   "crossing_frame": 3862,
+   "opening_starts": 3782,
+   "fully_open": 3792,
+   "open_lead_frames": 70,
+   "min_speed_mps_while_opening": 1.7,
+   "waited": false
+  }
+ ],
+ "mino_line_of_sight": {
+  "frames_clear": 202,
+  "frames_blocked": 98
+ },
+ "map_correspondence": {
+  "frames": 301,
+  "max_wolf_world_err_m": 0.00007,
+  "max_wolf_marker_err_px": 0.007,
+  "max_mino_world_err_m": 0.00007,
+  "max_trolley_world_err_m": 0.00007,
+  "pass": true
+ },
+ "pass": true
+}

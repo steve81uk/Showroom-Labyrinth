@@ -1,0 +1,64 @@
+{
+ "version": "bake_v2",
+ "blender": "5.3.0",
+ "res": 2048,
+ "floor_res": [
+  2048,
+  1479
+ ],
+ "spp": 64,
+ "solid_faces": 650,
+ "bins": [
+  "wall",
+  "wallTop",
+  "large",
+  "dark",
+  "small",
+  "anchor",
+  "partition",
+  "gondola",
+  "worktop",
+  "cage"
+ ],
+ "lamps": 32,
+ "camera_world_xz_h": [
+  33.5,
+  -2.0,
+  9.0
+ ],
+ "camera_target_world": [
+  33.5,
+  0.9,
+  -8.0
+ ],
+ "vfov_deg": 40,
+ "stats": {
+  "lm_floor": {
+   "w": 2048,
+   "h": 1479,
+   "min": 0.0,
+   "median": 0.8466,
+   "p99": 1.855,
+   "max": 2.3381,
+   "frac_above_1": 0.3685
+  },
+  "lm_solids": {
+   "w": 2048,
+   "h": 2048,
+   "min": 0.0,
+   "median": 0.5477,
+   "p99": 2.6463,
+   "max": 5.0264,
+   "frac_above_1": 0.1582
+  }
+ },
+ "times": {
+  "bake_lm_floor": 300.8,
+  "bake_lm_solids": 384.3,
+  "exposure_scale": 1.2038,
+  "floor_median_raw": 0.70607,
+  "ref_cycles_frame": 88.2,
+  "total": 779.1
+ },
+ "contains": "irradiance factor (DIFFUSE direct+indirect, no albedo), linear, EXR half ZIP; display = albedo x map (MeshBasic, lightMapIntensity=PI)"
+}

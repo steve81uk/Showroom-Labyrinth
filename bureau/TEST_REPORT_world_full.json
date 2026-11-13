@@ -1,0 +1,358 @@
+{
+ "tool": "bureau_validate.js v10d",
+ "range": {
+  "startFrame": 0,
+  "endFrame": 6396,
+  "convention": "start inclusive, end exclusive"
+ },
+ "fps": 30,
+ "substeps_per_frame": 4,
+ "shapes": {
+  "wolfgang_circle_m": 0.42,
+  "trolley_obb_m": [
+   0.62,
+   0.95
+  ],
+  "trolley_ahead_m": 0.95,
+  "mino_circle_m": 0.62,
+  "thread_radius_m": 0.03,
+  "thread_side_offset_m": -0.18,
+  "swing_leaf": "panel w x 0.06, hinge -w/2, sweep 0..85.5 deg",
+  "sliding_leaf": "w/2 x 0.08 pane"
+ },
+ "min_clearance_wolfgang_m": 0.374,
+ "hits": {
+  "wolfgang_obstacle": [],
+  "trolley_obstacle": [],
+  "mino_obstacle": [],
+  "thread_obstacle": [],
+  "wolfgang_door_leaf": [],
+  "trolley_door_leaf": [],
+  "mino_door_leaf": [],
+  "thread_door_leaf": [],
+  "door_leaf_vs_structure": []
+ },
+ "door_states": [
+  {
+   "id": "entry",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closing"
+    ],
+    [
+     1,
+     "opening"
+    ],
+    [
+     10,
+     "open"
+    ],
+    [
+     663,
+     "closing"
+    ],
+    [
+     673,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "exit",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     5736,
+     "opening"
+    ],
+    [
+     5746,
+     "open"
+    ]
+   ]
+  },
+  {
+   "id": "hall_core",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     5486,
+     "opening"
+    ],
+    [
+     5496,
+     "open"
+    ]
+   ]
+  },
+  {
+   "id": "ward_serv",
+   "kind": "swing",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     3782,
+     "opening"
+    ],
+    [
+     3792,
+     "open"
+    ],
+    [
+     3966,
+     "closing"
+    ],
+    [
+     3976,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "kit_hall",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     2485,
+     "opening"
+    ],
+    [
+     2495,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "hall_ward",
+   "kind": "sliding",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     2559,
+     "opening"
+    ],
+    [
+     2569,
+     "open"
+    ],
+    [
+     3886,
+     "closing"
+    ],
+    [
+     3896,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "serv_core",
+   "kind": "swing",
+   "staff": false,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     4167,
+     "opening"
+    ],
+    [
+     4177,
+     "open"
+    ],
+    [
+     4296,
+     "closing"
+    ],
+    [
+     4306,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "staff_s",
+   "kind": "swing",
+   "staff": true,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     4030,
+     "opening"
+    ],
+    [
+     4040,
+     "open"
+    ],
+    [
+     4088,
+     "closing"
+    ],
+    [
+     4098,
+     "closed"
+    ],
+    [
+     4840,
+     "opening"
+    ],
+    [
+     4850,
+     "open"
+    ],
+    [
+     4971,
+     "closing"
+    ],
+    [
+     4981,
+     "closed"
+    ]
+   ]
+  },
+  {
+   "id": "mino_closet",
+   "kind": "swing",
+   "staff": true,
+   "events": [
+    [
+     0,
+     "closed"
+    ],
+    [
+     2957,
+     "opening"
+    ],
+    [
+     2967,
+     "open"
+    ],
+    [
+     3071,
+     "closing"
+    ],
+    [
+     3081,
+     "closed"
+    ]
+   ]
+  }
+ ],
+ "door_approach": [
+  {
+   "door": "entry",
+   "kind": "sliding",
+   "crossing_frame": 561,
+   "opening_starts": 0,
+   "fully_open": 10,
+   "open_lead_frames": 551,
+   "min_speed_mps_while_opening": 0,
+   "waited": true
+  },
+  {
+   "door": "exit",
+   "kind": "sliding",
+   "crossing_frame": 5833,
+   "opening_starts": 5736,
+   "fully_open": 5746,
+   "open_lead_frames": 87,
+   "min_speed_mps_while_opening": 1.35,
+   "waited": false
+  },
+  {
+   "door": "hall_core",
+   "kind": "sliding",
+   "crossing_frame": 5526,
+   "opening_starts": 5486,
+   "fully_open": 5496,
+   "open_lead_frames": 30,
+   "min_speed_mps_while_opening": 2.85,
+   "waited": false
+  },
+  {
+   "door": "ward_serv",
+   "kind": "swing",
+   "crossing_frame": 3862,
+   "opening_starts": 3782,
+   "fully_open": 3792,
+   "open_lead_frames": 70,
+   "min_speed_mps_while_opening": 1.7,
+   "waited": false
+  },
+  {
+   "door": "kit_hall",
+   "kind": "sliding",
+   "crossing_frame": 2515,
+   "opening_starts": 2485,
+   "fully_open": 2495,
+   "open_lead_frames": 20,
+   "min_speed_mps_while_opening": 4.3,
+   "waited": false
+  },
+  {
+   "door": "hall_ward",
+   "kind": "sliding",
+   "crossing_frame": 2585,
+   "opening_starts": 2559,
+   "fully_open": 2569,
+   "open_lead_frames": 16,
+   "min_speed_mps_while_opening": 4.72,
+   "waited": false
+  },
+  {
+   "door": "serv_core",
+   "kind": "swing",
+   "crossing_frame": 4203,
+   "opening_starts": 4167,
+   "fully_open": 4177,
+   "open_lead_frames": 26,
+   "min_speed_mps_while_opening": 2.14,
+   "waited": false
+  }
+ ],
+ "mino_line_of_sight": {
+  "frames_clear": 2558,
+  "frames_blocked": 678
+ },
+ "map_correspondence": null,
+ "pass": true
+}

@@ -1,0 +1,29 @@
+{
+ "three": "169",
+ "glbMaterials": {
+  "wall": 1,
+  "wallTop": 1,
+  "large": 1,
+  "dark": 1,
+  "small": 1,
+  "anchor": 1,
+  "partition": 1,
+  "gondola": 1,
+  "worktop": 1,
+  "cage": 1
+ },
+ "meshesWithUv1": 10,
+ "lmSolids": [
+  2048,
+  2048
+ ],
+ "lmFloor": [
+  2048,
+  1479
+ ],
+ "type": "HalfFloat",
+ "flipY": false,
+ "channel": 1,
+ "colorSpace": "srgb-linear",
+ "lmflip": false
+}

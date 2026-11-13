@@ -1,0 +1,144 @@
+{
+ "generated": "2026-11-13",
+ "fps": 30,
+ "range_convention": "startFrame inclusive, endFrame exclusive",
+ "timeline_offset_frames": 0,
+ "audio_offset_s": 0.0,
+ "simulation_preroll_frames": 0,
+ "audio_mapping": "frame f <-> audio_master.wav t = f/30 s (ffmpeg -ss start/30 on the audio input)",
+ "tests": [
+  {
+   "id": "world_full_song",
+   "what": "independent swept collision + door-leaf + thread + structure test, frames [0,6396), 4 substeps",
+   "pass": true,
+   "min_clearance_wolfgang_m": 0.374,
+   "hits": {
+    "wolfgang_obstacle": 0,
+    "trolley_obstacle": 0,
+    "mino_obstacle": 0,
+    "thread_obstacle": 0,
+    "wolfgang_door_leaf": 0,
+    "trolley_door_leaf": 0,
+    "mino_door_leaf": 0,
+    "thread_door_leaf": 0,
+    "door_leaf_vs_structure": 0
+   },
+   "file": "bureau/TEST_REPORT_world_full.json"
+  },
+  {
+   "id": "strip_3700_4000_world",
+   "pass": true,
+   "hits": {
+    "wolfgang_obstacle": 0,
+    "trolley_obstacle": 0,
+    "mino_obstacle": 0,
+    "thread_obstacle": 0,
+    "wolfgang_door_leaf": 0,
+    "trolley_door_leaf": 0,
+    "mino_door_leaf": 0,
+    "thread_door_leaf": 0,
+    "door_leaf_vs_structure": 0
+   },
+   "door_approach": [
+    {
+     "door": "ward_serv",
+     "kind": "swing",
+     "crossing_frame": 3862,
+     "opening_starts": 3782,
+     "fully_open": 3792,
+     "open_lead_frames": 70,
+     "min_speed_mps_while_opening": 1.7,
+     "waited": false
+    }
+   ],
+   "file": "bureau/TEST_REPORT_strip_3700_4000.json"
+  },
+  {
+   "id": "strip_3700_4000_map_correspondence",
+   "what": "browser map log vs independent re-derivation of positions and projection",
+   "result": {
+    "frames": 301,
+    "max_wolf_world_err_m": 7e-05,
+    "max_wolf_marker_err_px": 0.007,
+    "max_mino_world_err_m": 7e-05,
+    "max_trolley_world_err_m": 7e-05,
+    "pass": true
+   },
+   "pass": true
+  },
+  {
+   "id": "bake_vs_cycles",
+   "what": "Three.js r169 baked display vs Blender Cycles 128spp path trace, same camera, 960x540, no tone mapping",
+   "mean_abs_diff_8bit": 1.62,
+   "median": 1.0,
+   "p95": 5.0,
+   "pass": true,
+   "note": "residual differences on silhouettes (antialiasing) only; sky region excluded",
+   "file": "bureau/bake/bake_compare_sheet.jpg"
+  },
+  {
+   "id": "bake_uv_orientation",
+   "result": "EXRLoader rows run bottom-up; uv1 from glTF (1-v) flipped back; floor planar v = (26 - z)/52. Wrong orientation measured at mean diff 35.7 (both unflipped) and 14.0 (floor unflipped).",
+   "pass": true
+  }
+ ],
+ "known_failures_or_gaps": [
+  {
+   "id": "door_wait",
+   "detail": "Wolfgang never waits at a door: ward_serv is fully open 70 frames before he arrives (sensor range 4.6 m). The brief asked for an approach-wait-open-pass beat. Needs an authored stop in the timeline (approval: changes pacing).",
+   "severity": "creative"
+  },
+  {
+   "id": "wolfgang_placeholder",
+   "detail": "Engine v10 Wolfgang is a grey-block 3D placeholder (top hat, coat). The approved sprite atlas exists but is not wired into v10.",
+   "severity": "blocking for master"
+  },
+  {
+   "id": "mino_pursuit_after_detect",
+   "detail": "After first detection (frame 3053) MINO stays locked on even when line of sight is blocked (98 of 300 strip frames blocked). No search state yet.",
+   "severity": "behaviour"
+  },
+  {
+   "id": "checkin3_map_gag",
+   "detail": "Authored MAP_CHECKIN_3 says MINO blip passes through a wall. Conflicts with the new rule that the map mirrors world transforms. Not implemented; needs decision.",
+   "severity": "creative"
+  },
+  {
+   "id": "checkin5_ext",
+   "detail": "MAP_CHECKIN_5 is authored on an EXT row (frame 5988) as a seamless rise; v10d only turns MAP rows into arcade maps, so check-in 5 is not an arcade map yet.",
+   "severity": "creative"
+  },
+  {
+   "id": "actor_light_match",
+   "detail": "Actors are lit by a live hemisphere + overhead directional approximating the baked ceiling lamps; no light probes. Contact shadows are blob approximations (labelled in DEBUG).",
+   "severity": "quality"
+  },
+  {
+   "id": "unbaked_static",
+   "detail": "Static items NOT in the bake (lit live): lyric-dressing props and signs, door frames and headers, anchor-bed pillow/throw, car park, ceiling truss. Zone floor tints use the floor lightmap but were baked as plain concrete.",
+   "severity": "quality"
+  }
+ ],
+ "benchmark_strip_1280x720": {
+  "frames": 300,
+  "workers": 2,
+  "render_wall_s": 117.79,
+  "effective_fps": 2.55,
+  "per_frame_capture_ms_median": 697,
+  "per_frame_scene_update_ms_median": 17,
+  "note": "WebGL work is flushed at screenshot time, so capture_ms contains the actual render; scene_update_ms is JS only.",
+  "encode_wall_s": 6.008,
+  "peak_rss_mb_process_tree": 1223,
+  "frame_png_disk_mb": 372,
+  "mkv_mb": 20.3,
+  "not_measured_yet": "1920x1080 final resolution, overhead-dense core, full-screen map, MINO-sensor-heavy chase: stage 5"
+ },
+ "benchmark_bake": {
+  "blender": "5.3.0",
+  "floor_2048x1479_64spp_s": 300.8,
+  "solids_2048_64spp_s": 384.3,
+  "cycles_ref_frame_960x540_128spp_s": 88.2,
+  "total_s": 779.1,
+  "peak_rss_mb": 1553
+ }
+}

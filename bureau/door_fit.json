@@ -1,0 +1,147 @@
+{
+ "ward_serv": {
+  "chosen": {
+   "hinge": -1,
+   "dir": 1,
+   "conflicts": 0
+  },
+  "tried": [
+   {
+    "hinge": -1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": -1,
+    "dir": -1,
+    "conflicts": 15
+   },
+   {
+    "hinge": 1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": -1,
+    "conflicts": 0
+   }
+  ]
+ },
+ "staff_k": {
+  "chosen": {
+   "hinge": -1,
+   "dir": 1,
+   "conflicts": 0
+  },
+  "tried": [
+   {
+    "hinge": -1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": -1,
+    "dir": -1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": -1,
+    "conflicts": 0
+   }
+  ]
+ },
+ "serv_core": {
+  "chosen": {
+   "hinge": -1,
+   "dir": 1,
+   "conflicts": 0
+  },
+  "tried": [
+   {
+    "hinge": -1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": -1,
+    "dir": -1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": 1,
+    "conflicts": 81
+   },
+   {
+    "hinge": 1,
+    "dir": -1,
+    "conflicts": 0
+   }
+  ]
+ },
+ "staff_s": {
+  "chosen": {
+   "hinge": -1,
+   "dir": -1,
+   "conflicts": 0
+  },
+  "tried": [
+   {
+    "hinge": -1,
+    "dir": 1,
+    "conflicts": 1
+   },
+   {
+    "hinge": -1,
+    "dir": -1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": -1,
+    "conflicts": 0
+   }
+  ]
+ },
+ "mino_closet": {
+  "chosen": {
+   "hinge": -1,
+   "dir": -1,
+   "conflicts": 0
+  },
+  "tried": [
+   {
+    "hinge": -1,
+    "dir": 1,
+    "conflicts": 15
+   },
+   {
+    "hinge": -1,
+    "dir": -1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": 1,
+    "conflicts": 0
+   },
+   {
+    "hinge": 1,
+    "dir": -1,
+    "conflicts": 0
+   }
+  ]
+ }
+}
