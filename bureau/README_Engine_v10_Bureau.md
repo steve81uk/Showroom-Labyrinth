@@ -98,3 +98,15 @@ Walk-speed scale per leg: 0.87, 1.21, 1.00, 1.09, 0.87.
 - Thread reel-back.
 - Wolfgang's final character rig in this world.
 - Lighting pass, then the beauty pass.
+
+## Blender evaluation (2026-11-13)
+bpy 5.3.0 headless in the sandbox (2 CPU cores, no GPU), one 960x540 overhead frame of the v10 floor plan (`blender_bench.py`):
+
+| Engine | s/frame | Full song (6396 f) |
+|---|---|---|
+| Workbench | 2.0 | ~3.6 h |
+| EEVEE (software GL, EGL errors) | 88.8 | ~158 h |
+| Cycles CPU, 32 spp + denoise | 23.6 | ~42 h (bare geometry) |
+| Three.js v10 + bloom | ~0.35 | ~35 min |
+
+Decision: Blender is the asset and lighting tool, not the frame renderer. Plan: bake Cycles GI + AO lightmaps for the static store once, export glTF with lightmaps, render animation in Three.js. Contact sheet: `docs/blender_bench_sheet.jpg`.
