@@ -358,8 +358,15 @@ async function sceneMain(THREE, X) {
   const ROOMKIT2 = { bedroom: ['bedroom', 'living2', 'bedroom'], kitchen: ['dining', 'kitchen', 'dining'], office: ['office', 'library', 'office'], living: ['living', 'living2', 'library'], storage: ['storage', 'storage', 'library'] };
   const OLDKIT_FOR = { bedroom: 'bed', living: 'sofa', living2: 'sofa', dining: 'table', kitchen: 'counter', office: 'desk', library: 'shelf', storage: 'rack' };
   const kitOk = k => KITS2[k].every(([n]) => FURN[n]);
-  const placeFurn = (n, wx, wz, wry, lx, lz, lr, ly = 0) => { const v = V3(lx, 0, lz).applyAxisAngle(V3(0, 1, 0), wry);
-    FURN[n].placements.push(new THREE.Matrix4().compose(V3(wx + v.x, ly, wz + v.z), new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), wry + lr), V3(1, 1, 1))); };
+  // swept route of Wolfgang + trolley + MINO: furniture footprints must stay clear of it
+  const SWEEP = []; for (let s_ = 0; s_ <= LDOOR + 2; s_ += 0.2) SWEEP.push(posAt(s_));
+  const inFoot = (px, pz, cx, cz, th, hx, hz) => { const dx = px - cx, dz = pz - cz, c_ = Math.cos(th), s_ = Math.sin(th);
+    return Math.abs(dx * c_ - dz * s_) <= hx && Math.abs(dx * s_ + dz * c_) <= hz; };
+  let furnDropRoute = 0, furnDropCam = 0;
+  const placeFurn = (n, wx, wz, wry, lx, lz, lr, ly = 0, clear = 0.95) => { const v = V3(lx, 0, lz).applyAxisAngle(V3(0, 1, 0), wry);
+    const cx = wx + v.x, cz = wz + v.z, th = wry + lr, sz = FURN[n].size;
+    if (ly < 2.2 && clear > 0 && SWEEP.some(q => inFoot(q.x, q.z, cx, cz, th, sz.x / 2 + clear, sz.z / 2 + clear))) { furnDropRoute++; return false; }
+    FURN[n].placements.push(new THREE.Matrix4().compose(V3(cx, ly, cz), new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), th), V3(1, 1, 1))); return true; };
   const tags = [];   // price-tag anchors
   const clocks = []; // wall clocks (9:45 in every room)
   const lamps = [];  // Icarus lamps
@@ -378,8 +385,8 @@ async function sceneMain(THREE, X) {
       if (kitOk(kit2)) {
         let first = null;
         for (const [mn, lx, lz0, lr, on] of KITS2[kit2]) { const sz = FURN[mn].size, rot90 = Math.abs(Math.sin(lr)) > 0.7, dep = rot90 ? sz.x : sz.z;
-          const lz = lz0 === 'auto' ? dep / 2 + T / 2 + 0.04 : lz0, ly = on && FURN[on] ? FURN[on].size.y : 0; placeFurn(mn, wx, wz, ry, lx, lz, lr, ly); if (!first) first = { mn, lx, lz, dep, h: sz.y }; }
-        tags.push({ p: toW(first.lx + 0.25, Math.min(1.0, first.h * 0.75), first.lz + first.dep / 2 + 0.02), ry, cell: c, kind: kit2 });
+          const lz = lz0 === 'auto' ? dep / 2 + T / 2 + 0.04 : lz0, ly = on && FURN[on] ? FURN[on].size.y : 0; if (placeFurn(mn, wx, wz, ry, lx, lz, lr, ly) && !first) first = { mn, lx, lz, dep, h: sz.y }; }
+        if (first) tags.push({ p: toW(first.lx + 0.25, Math.min(1.0, first.h * 0.75), first.lz + first.dep / 2 + 0.02), ry, cell: c, kind: kit2 });
         if (/storage|library/.test(kit2)) columns.push({ p: toW(0, 0, 0.2), ry, cell: c });
         if (k === 1 && onPath[c]) clocks.push({ p: toW(-1.6, 2.05, 0.02), ry, cell: c });
         continue; }
@@ -405,14 +412,20 @@ async function sceneMain(THREE, X) {
     const wx = x - n.x * (CS / 2 - T / 2 - 0.15), wz = z - n.z * (CS / 2 - T / 2 - 0.15); FURN.security_camera_01.placements.push(new THREE.Matrix4().compose(V3(wx + n.z * 2.5, WALL_H - 0.35, wz - n.x * 2.5), new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), Math.atan2(n.x, n.z) + 0.5), V3(1, 1, 1))); });
   if (FURN.CashRegister_01 && FURN.side_table_01) { const [x, z] = cellXZ(MZ.exit); placeFurn('side_table_01', x + 1.8, z - CS / 2 + 0.9, 0, 0, 0, Math.PI); placeFurn('CashRegister_01', x + 1.8, z - CS / 2 + 0.9, 0, 0, 0, Math.PI, FURN.side_table_01.size.y); }
   // one InstancedMesh per (model, mesh): a few hundred draw calls at most, whatever the room count
-  const furnInst = []; let furnCount = 0;
+  const furnInst = []; let furnCount = 0, furnTris = 0;
+  function buildFurnInstances() {
+    const CAMS = []; for (let f = 0; f < N; f += 2) { const cp = cameraAt(f).pos; if (cp.y < 3.2 && cp.z > -MAZE_D / 2 - 0.5) CAMS.push(cp.clone()); }
+    for (const F_ of Object.values(FURN)) F_.placements = F_.placements.filter(pm => { const e = pm.elements; if (e[13] > 2.2) return true;
+      const th = Math.atan2(e[8], e[0]), hx = F_.size.x / 2 + 0.6, hz = F_.size.z / 2 + 0.6;
+      const hit = CAMS.some(q => q.y < F_.size.y + e[13] + 0.6 && inFoot(q.x, q.z, e[12], e[14], th, hx, hz)); if (hit) furnDropCam++; return !hit; });
   // spatial tiles of 3x3 cells so frustum culling (main + shadow pass) rejects whole far tiles
-  const TILE = CS * 3, tileOf = m => { const e = m.elements; return Math.floor(e[12] / TILE) + ',' + Math.floor(e[14] / TILE); };
-  for (const [n, F_] of Object.entries(FURN)) { if (!F_.placements.length) continue; furnCount += F_.placements.length;
-    const byTile = {}; F_.placements.forEach(pm => (byTile[tileOf(pm)] || (byTile[tileOf(pm)] = [])).push(pm));
-    for (const list of Object.values(byTile)) for (const part of F_.parts) { const im = new THREE.InstancedMesh(part.geo, part.mat, list.length); im.castShadow = !/fluorescent|ceiling_lamp|security_camera/.test(n); im.receiveShadow = true;
-      list.forEach((pm, i) => im.setMatrixAt(i, pm.clone().multiply(part.m))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.computeBoundingBox && im.computeBoundingBox(); staticGroup.add(im); furnInst.push(im); } }
-  let furnTris = 0; Object.values(FURN).forEach(F_ => F_.parts.forEach(pp => { const g = pp.geo; furnTris += (g.index ? g.index.count : g.attributes.position.count) / 3 * F_.placements.length; }));
+    const TILE = CS * 3, tileOf = m => { const e = m.elements; return Math.floor(e[12] / TILE) + ',' + Math.floor(e[14] / TILE); };
+    for (const [n, F_] of Object.entries(FURN)) { if (!F_.placements.length) continue; furnCount += F_.placements.length;
+      const byTile = {}; F_.placements.forEach(pm => (byTile[tileOf(pm)] || (byTile[tileOf(pm)] = [])).push(pm));
+      for (const list of Object.values(byTile)) for (const part of F_.parts) { const im = new THREE.InstancedMesh(part.geo, part.mat, list.length); im.castShadow = !/fluorescent|ceiling_lamp|security_camera/.test(n); im.receiveShadow = true;
+        list.forEach((pm, i) => im.setMatrixAt(i, pm.clone().multiply(part.m))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.computeBoundingBox && im.computeBoundingBox(); staticGroup.add(im); furnInst.push(im); } }
+    let furnTris = 0; Object.values(FURN).forEach(F_ => F_.parts.forEach(pp => { const g = pp.geo; furnTris += (g.index ? g.index.count : g.attributes.position.count) / 3 * F_.placements.length; }));
+  }
   const furnBase = new Map(); furnMats.forEach(m => { if (m.color) furnBase.set(m, m.color.clone()); });
 
   // ---------------------------------------------------------------- textured props: price tags, clocks, arrows
@@ -610,6 +623,7 @@ async function sceneMain(THREE, X) {
   const fpCell = MZ.pathCells[Math.min(MZ.pathCells.length - 1, 18)];
   // exit door glow + car park
   const [exX, exZ] = cellXZ(MZ.exit);
+  const DOOR_W = CS * 0.4, DOOR_H = 2.7, doorLeaves = []; let doorOpen = 0;
   const doorGlow = new THREE.Mesh(new THREE.PlaneGeometry(CS * 0.4, 2.6), new THREE.MeshBasicMaterial({ color: 0xbfeaff, transparent: true, opacity: 0.85 }));
   doorGlow.position.set(exX, 1.3, -MAZE_D / 2 - 0.05); scene.add(doorGlow);
   // ---------------------------------------------------------------- CAR PARK (v9e): PBR asphalt, modelled cars, bays, lamps, shelter, moving extras
@@ -633,7 +647,7 @@ async function sceneMain(THREE, X) {
   // modelled car: extruded side profile (rounded), glasshouse, wheels with rims, lights, plates, mirrors
   const plateTex = txt => canvasTex(256, 56, (c) => { c.fillStyle = txt[1]; c.fillRect(0, 0, 256, 56); c.strokeStyle = '#111'; c.lineWidth = 3; c.strokeRect(2, 2, 252, 52); c.fillStyle = '#111'; c.font = 'bold 40px DejaVu Sans Mono'; c.textAlign = 'center'; c.fillText(txt[0], 128, 42); });
   const TYPES = { hatch: { L: 4.05, H: 1.46, hood: 0.95, tail: 0.25, wb: 2.55, rw: 0.31 }, sedan: { L: 4.65, H: 1.42, hood: 1.15, tail: 0.85, wb: 2.75, rw: 0.32 },
-    suv: { L: 4.6, H: 1.72, hood: 1.05, tail: 0.3, wb: 2.7, rw: 0.36 }, van: { L: 5.0, H: 1.95, hood: 0.7, tail: 0.1, wb: 3.0, rw: 0.34 } };
+    suv: { L: 4.6, H: 1.72, hood: 1.05, tail: 0.3, wb: 2.7, rw: 0.36 }, mpv: { L: 4.53, H: 1.66, hood: 0.9, tail: 0.08, wb: 2.79, rw: 0.33 }, van: { L: 5.0, H: 1.95, hood: 0.7, tail: 0.1, wb: 3.0, rw: 0.34 } };
   const honey = canvasTex(256, 128, (c) => { c.fillStyle = '#060607'; c.fillRect(0, 0, 256, 128); c.strokeStyle = '#2c2e33'; c.lineWidth = 2;
     for (let y = 0; y < 140; y += 12) for (let x = (y / 12 % 2) * 10; x < 270; x += 20) { c.beginPath(); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; c.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); } c.closePath(); c.stroke(); } });
   const CM = {   // shared car materials (paint is per car)
@@ -669,7 +683,7 @@ async function sceneMain(THREE, X) {
       add(new THREE.ExtrudeGeometry(shapeOf(rf), { depth: Wd - 0.34, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.015, bevelSegments: 3 }).translate(0, 0, -(Wd - 0.34) / 2), paint, 0, 0, 0);
       for (const [a, b] of [[gp[0], gp[1]], [gp[3], gp[2]]]) for (const sz of [-1, 1]) { const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
         const pl = add(BX(len + 0.04, 0.07, 0.06), paint, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, sz * (Wd - 0.29) / 2, false); pl.rotation.z = Math.atan2(dy, dx); } }
-    const pillars = typeName === 'van' ? [x0 + T.hood + 1.5] : typeName === 'hatch' ? [x0 + T.hood + 1.42] : [x0 + T.hood + 1.5, L / 2 - T.tail - 0.95];
+    const pillars = typeName === 'van' ? [x0 + T.hood + 1.5] : typeName === 'hatch' ? [x0 + T.hood + 1.42] : typeName === 'mpv' ? [x0 + T.hood + 1.45, L / 2 - T.tail - 0.82] : [x0 + T.hood + 1.5, L / 2 - T.tail - 0.95];
     for (const px of pillars) add(BX(0.1, H - belt - 0.05, Wd - 0.22), CM.trim, px, (H + belt) / 2 - 0.01, 0, false);
     // --- sills, bumpers, grille, lights
     for (const sz of [-1, 1]) { add(BX(T.wb - 2 * rw - 0.24, 0.1, 0.04), CM.plastic, 0, 0.33, sz * (Wd / 2 - 0.005), false);
@@ -691,7 +705,7 @@ async function sceneMain(THREE, X) {
     add(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 24).rotateZ(Math.PI / 2), CM.chrome, x0 - 0.05, 0.6, 0, false);
     // wipers, roof rails, shark fin
     for (const wz of [-0.32, 0.38]) { const w = add(BX(0.02, 0.012, 0.6), CM.trim, x0 + T.hood + 0.08, belt + 0.05, wz, false); w.rotation.y = 0.25; }
-    if (typeName === 'suv' || typeName === 'van') for (const sz of [-1, 1]) add(BX(L * 0.42, 0.04, 0.04), CM.plastic, (x0 + T.hood + 1.05 + L / 2 - T.tail - 0.58) / 2, H + 0.07, sz * 0.62, false);
+    if (typeName === 'suv' || typeName === 'van' || typeName === 'mpv') for (const sz of [-1, 1]) add(BX(L * 0.42, 0.04, 0.04), CM.plastic, (x0 + T.hood + 1.05 + L / 2 - T.tail - 0.58) / 2, H + 0.07, sz * 0.62, false);
     add(BX(0.16, 0.06, 0.05), paint, L / 2 - T.tail - 0.7, H + 0.06, 0, false);
     // --- wheels: lathe tyre, five-spoke rim, lug nuts, brake disc + caliper; arch liners
     const calCol = [0xb31b1b, 0x5d6066, 0xc9a227][Math.floor(r() * 3)];
@@ -712,6 +726,7 @@ async function sceneMain(THREE, X) {
     const bp = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.11), new THREE.MeshStandardMaterial({ map: plateTex([reg, '#f6c800']), roughness: 0.35 })); bp.rotation.y = Math.PI / 2; bp.position.set(L / 2 + 0.04, 0.58, 0); g.add(bp);
     const cs = new THREE.Mesh(new THREE.PlaneGeometry(L * 1.08, Wd * 1.15).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.9 })); cs.position.y = 0.012; g.add(cs);
     return g; }
+  const HERO_COL = 0x2b3a4e;   // deep slate blue metallic; change here to match the real car
   const CARCOL = [0x8a8f96, 0x24272c, 0xa3221c, 0xe8e8e6, 0x2c4a78, 0x3d5c45, 0xb8b0a0, 0x5a1f2b, 0x0f0f10, 0xd8d8d2];
   const CARTYPES = ['hatch', 'sedan', 'suv', 'hatch', 'van', 'sedan', 'suv', 'hatch'];
   const cars = [];
@@ -743,7 +758,16 @@ async function sceneMain(THREE, X) {
     sign.position.set(sx, 2.7, sz + 1.0); park.add(sign);
     for (let k = 0; k < 5; k++) { const t = trolley.clone(true); t.traverse(o => { if (o.name === 'flatbox') o.visible = false; }); t.rotation.y = Math.PI / 2; t.position.set(sx - 1.8 + k * 0.36, 0, sz); park.add(t); } }
   // facade: store front with a fictional sign and glazing
-  { const fac = new THREE.Mesh(new THREE.BoxGeometry(MAZE_W + 2, 9, 1), new THREE.MeshStandardMaterial({ color: 0x1d3f8f, roughness: 0.65, metalness: 0.1 })); fac.position.set(0, 4.5, PZ - 0.6); fac.receiveShadow = true; park.add(fac);
+  { const facM = new THREE.MeshStandardMaterial({ color: 0x1d3f8f, roughness: 0.65, metalness: 0.1 }), FW = MAZE_W + 2, xl = -FW / 2, xr = FW / 2, dl = exX - DOOR_W / 2, dr = exX + DOOR_W / 2;
+    for (const [x0_, x1_] of [[xl, dl], [dr, xr]]) { const fac = new THREE.Mesh(new THREE.BoxGeometry(x1_ - x0_, 9, 1), facM); fac.position.set((x0_ + x1_) / 2, 4.5, PZ - 0.6); fac.receiveShadow = fac.castShadow = true; park.add(fac); }
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W, 9 - DOOR_H, 1), facM); hdr.position.set(exX, DOOR_H + (9 - DOOR_H) / 2, PZ - 0.6); hdr.castShadow = true; park.add(hdr);
+    const frM = new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.35, metalness: 0.8 }), glM = new THREE.MeshPhysicalMaterial({ color: 0xbfd3dc, metalness: 0, roughness: 0.04, transmission: 0.0, transparent: true, opacity: 0.32, envMapIntensity: 2.2 });
+    for (const sd of [-1, 1]) { const leaf = new THREE.Group(); const pw = DOOR_W / 2;
+      const gl_ = new THREE.Mesh(new THREE.BoxGeometry(pw - 0.08, DOOR_H - 0.14, 0.02), glM); gl_.position.y = DOOR_H / 2; leaf.add(gl_);
+      for (const [w_, h_, x_, y_] of [[pw, 0.07, 0, 0.035], [pw, 0.07, 0, DOOR_H - 0.035], [0.05, DOOR_H, -pw / 2 + 0.025, DOOR_H / 2], [0.05, DOOR_H, pw / 2 - 0.025, DOOR_H / 2], [0.3, 0.03, sd * -(pw / 2 - 0.25), 1.05]])
+        { const b_ = new THREE.Mesh(new THREE.BoxGeometry(w_, h_, 0.06), frM); b_.position.set(x_, y_, 0); b_.castShadow = true; leaf.add(b_); }
+      leaf.userData.closedX = exX + sd * pw / 2; leaf.userData.sd = sd; leaf.position.set(leaf.userData.closedX, 0, PZ - 0.6); park.add(leaf); doorLeaves.push(leaf); }
+    const trk = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W * 2, 0.18, 0.3), frM); trk.position.set(exX, DOOR_H + 0.09, PZ - 0.6); park.add(trk);
     const st = new THREE.Mesh(new THREE.BoxGeometry(MAZE_W + 2.1, 1.2, 1.05), new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.55 })); st.position.set(0, 7.6, PZ - 0.6); park.add(st);
     const sg = new THREE.Mesh(new THREE.PlaneGeometry(18, 3), new THREE.MeshStandardMaterial({ map: canvasTex(1024, 170, (c) => { c.clearRect(0, 0, 1024, 170); c.fillStyle = '#ffd400'; c.font = 'bold 140px DejaVu Sans'; c.textAlign = 'center'; c.fillText('DAEDALUS', 512, 140); }), transparent: true, emissive: 0xffd400, emissiveIntensity: 0.25 }));
     sg.position.set(exX, 5.3, PZ - 1.12); sg.rotation.y = Math.PI; park.add(sg);
@@ -757,17 +781,9 @@ async function sceneMain(THREE, X) {
       free.slice(0, 2).forEach(([bx, rz, face], i) => { const c = prep(i ? cov.clone(true) : cov); c.position.set(bx, 0, rz + face * 0.25); c.rotation.y = (hash(i, 5) - 0.5) * 0.12; park.add(c); }); }
     if (lamp) for (const lz of [PZ - 9, PZ - 21.5, PZ - 34]) for (const sd of [-1, 1]) { const l = prep(lamp.clone(true)); l.position.set(exX + sd * 5.2, 0, lz); l.rotation.y = sd > 0 ? Math.PI : 0; park.add(l); }
     if (tyre) for (const [x, z, ry, lean] of [[exX + 10.6, PZ - 5.2, 0.4, 0.15], [exX + 11.1, PZ - 5.0, 1.2, 1.5708]]) { const t = prep(tyre.clone(true)); t.children[0].rotation.x = lean; t.position.set(x, 0, z); t.rotation.y = ry; park.add(t); } }
-  // hero car: Khronos 'Car Concept' (CC-BY 4.0), in the bay beside the walkway
-  { const hc = await new Promise(res => GL.load('props/car/CarConcept.glb', g => res(g.scene), undefined, () => res(null)));
-    if (hc) { hc.traverse(o => { if (/Emblem/i.test(o.name)) o.visible = false; if (o.isMesh) { o.castShadow = o.receiveShadow = true;
-        if (o.material && /License/i.test(o.material.name)) { o.material = o.material.clone(); o.material.map = plateTex(['DA3D LUS', '#f6c800']); o.material.emissiveMap = null; o.material.needsUpdate = true; } } });
-      hc.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(hc), sz = b.getSize(V3());
-      const wrap = new THREE.Group(); wrap.add(hc); hc.rotation.y = 0; /* CarConcept native length is +z; its bbox is skewed by wide helper meshes */ hc.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(hc); const cc = b.getCenter(V3());
-      hc.position.set(-cc.x, -b.min.y, -cc.z);
-      const bayK = 3, slot = cars.find(c => c.ri === 0 && c.k === bayK); if (slot) { park.remove(slot.c); cars.splice(cars.indexOf(slot), 1); }
-      wrap.position.set(exX + bayK * 2.6, 0, PZ - 11 + 0.25); wrap.rotation.y = Math.PI; park.add(wrap);
-      const cs = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 4.9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.9 })); cs.position.y = 0.012; wrap.add(cs);
-      window.__heroCar = true; } }
+  // hero car: an original compact MPV (Touran proportions, Stephen's own car), no badges, in the bay beside the walkway
+  { const bayK = 3, slot = cars.find(c => c.ri === 0 && c.k === bayK); if (slot) { park.remove(slot.c); cars.splice(cars.indexOf(slot), 1); }
+    const hm = makeCar(81081, HERO_COL, 'mpv'); hm.rotation.y = -Math.PI / 2; hm.position.set(exX + bayK * 2.6, 0, PZ - 11 + 0.25); park.add(hm); window.__heroCar = 'mpv'; }
   // moving extras: a runaway trolley, and one car reversing out of its bay
   const runaway = trolley.clone(true); runaway.traverse(o => { if (o.name === 'flatbox') o.visible = false; }); park.add(runaway);
   const reverser = cars.filter(c => c.ri === 0).sort((a, b) => Math.abs(a.x - exX - 7) - Math.abs(b.x - exX - 7))[0];
@@ -1124,6 +1140,7 @@ async function sceneMain(THREE, X) {
   }
 
   // ---------------------------------------------------------------- frame entry point
+  buildFurnInstances();
   let lastCam = null;
   async function renderFrame(f) {
     f = clamp(f | 0, 0, N - 1);
@@ -1134,6 +1151,9 @@ async function sceneMain(THREE, X) {
     camera.updateMatrixWorld();
     const P = posAt(S[f]), h = HEAD[f], rt = V3(-h.z, 0, h.x);
     const outside = f >= doorFrame;
+    { const d_ = S[f] - LDOOR, op = smooth(clamp((d_ + 3.4) / 1.6, 0, 1)) * (1 - smooth(clamp((d_ - 3.2) / 1.6, 0, 1)));
+      for (const lf of doorLeaves) lf.position.x = lf.userData.closedX + lf.userData.sd * op * (DOOR_W / 2 - 0.06);
+      doorOpen = op; }
     // wolfgang
     const [anim, idx, mirror, view, trolleyVis] = wolfFrame(f, camera.position);
     wolf.set(anim, idx, mirror);
@@ -1208,8 +1228,8 @@ async function sceneMain(THREE, X) {
     // price tags flicker in 16ths on the knossos/measurements beat
     const tagFlick = f >= sec2f(109.9) && f < sec2f(113.9);
     tagMat.emissiveIntensity = tagFlick ? (Math.floor(beatPos[f] * 4) % 2 ? 1.6 : 0.1) : 0.25;
-    doorGlow.material.opacity = f >= F.hudOff ? 0.6 + 0.4 * smooth((f - F.hudOff) / 60) : 0.25;
-    park.visible = (outside || mapView || mode === 'EXT' || f >= F.hudOff) && !pacOn; doorGlow.visible = !pacOn; fourPoster.visible = fourPoster.visible;
+    doorGlow.material.opacity = (f >= F.hudOff ? 0.6 + 0.4 * smooth((f - F.hudOff) / 60) : 0.25) * (1 - doorOpen);
+    park.visible = (outside || mapView || mode === 'EXT' || f >= F.hudOff) && !pacOn; doorGlow.visible = !pacOn && doorGlow.material.opacity > 0.02; if (Q.get('hide') === 'park') park.visible = false; if (Q.get('hide') === 'glow') doorGlow.visible = false; fourPoster.visible = fourPoster.visible;
     // wheels roll with distance travelled
     trolley.traverse(o => { if (o.name === 'wheel') o.rotation.x = -S[f] / 0.06; });
     if (park.visible) {
@@ -1278,7 +1298,7 @@ async function sceneMain(THREE, X) {
   window.exportTelemetry = res => ({ track_name: M.track_name, bpm: M.bpm, resolution_target: res, total_frames_at_30fps: N, telemetry: M.telemetry });
   window.renderFrame = renderFrame;
   window.engineReport = { frames: N, fps: FPS, res: `${W}x${H}`, atlas: !!atlasTex, normal: !!normalTex, seed: SEED, cell_m: +CS.toFixed(3), route_m: +LDOOR.toFixed(1),
-    path_cells: MZ.pathCells.length, furniture_models: Object.keys(FURN).length, furniture_pieces: furnCount, scanned: Object.entries(SCAN).filter(([, v]) => v).map(([k]) => k).join('+'), hero_car: !!window.__heroCar, furn_tris_total: Math.round(furnTris), furn_draws: furnInst.length, furn_sample: ['bedroom','living','living2','dining','kitchen','office','library','storage'].map(k => { const t = tags.find(t_ => t_.kind === k && onPath[t_.cell]) || tags.find(t_ => t_.kind === k); return t ? [k, +t.p.x.toFixed(2), +t.p.z.toFixed(2), +t.ry.toFixed(2)] : [k]; }), door_frame: doorFrame, exit_x: +exX.toFixed(2), store_front_z: +(-MAZE_D / 2).toFixed(2), keyframes: F,
+    path_cells: MZ.pathCells.length, furniture_models: Object.keys(FURN).length, furniture_pieces: furnCount, scanned: Object.entries(SCAN).filter(([, v]) => v).map(([k]) => k).join('+'), hero_car: window.__heroCar || false, furn_dropped_route: furnDropRoute, furn_dropped_cam: furnDropCam, furn_tris_total: Math.round(furnTris), furn_draws: furnInst.length, furn_sample: ['bedroom','living','living2','dining','kitchen','office','library','storage'].map(k => { const t = tags.find(t_ => t_.kind === k && onPath[t_.cell]) || tags.find(t_ => t_.kind === k); return t ? [k, +t.p.x.toFixed(2), +t.p.z.toFixed(2), +t.ry.toFixed(2)] : [k]; }), door_frame: doorFrame, exit_x: +exX.toFixed(2), store_front_z: +(-MAZE_D / 2).toFixed(2), keyframes: F,
     gpu: (() => { const g = renderer.getContext(); const e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'n/a'; })() };
   await renderFrame(Number(Q.get('f') || 0));
   window.engineReady = true;

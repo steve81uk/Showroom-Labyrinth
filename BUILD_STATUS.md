@@ -60,3 +60,9 @@ This section was added after inspecting real files. It does not change the shot 
 - Unattended chain: `run_master_block.sh` (retries crashed chunks), `watch_block.sh` (returns as soon as the runner dies), with a scheduled follow-up message every 2 hours.
 - Review flags: FPV shots at about 0:13 and 3:20 pass very close to furniture (a bed post fills part of the frame).
 - Not uploaded or scheduled anywhere. Still required before release: the CarConcept CC-BY credit line, and a check that the hero car's star wheel centres are not a logo.
+
+## 2026-11-13: v9 paused, v10 Bureau rebuild started
+
+- v9 (`engine/`) is paused as a diagnostic reference. Its last state includes the v9h fixes: walkway and camera clearance, a real exit opening with sliding doors, and the original Touran-style hero MPV. The CC-BY car was removed.
+- v10 (`bureau/`) is the Bureau & Co. rebuild: floor plan, A* route, a collision-test gate, doors, MINO-7000, the thread, and the overhead floor-plan camera. The grey-block navigation test passes. See `bureau/README_Engine_v10_Bureau.md`.
+- The Sensory Perimeter is parked for another time.
