@@ -1,5 +1,5 @@
 {
- "route_m": 409.1,
+ "route_m": 420.5,
  "legs": [
   {
    "label": "entrance",
@@ -12,42 +12,55 @@
    "s1": 36.9
   },
   {
-   "label": "bedrooms, kitchens, exit hall, wardrobes",
-   "len": 132.8,
-   "s1": 169.8
+   "label": "wrong turn: the glitched arrows lead into a dead end",
+   "len": 7.4,
+   "s1": 44.3
+  },
+  {
+   "label": "back out; kitchens, exit hall, wardrobes",
+   "len": 136.9,
+   "s1": 181.2
   },
   {
    "label": "MINO wakes; into service",
    "len": 30.9,
-   "s1": 200.7
+   "s1": 212.2
   },
   {
    "label": "service corridors",
    "len": 41.8,
-   "s1": 242.5
+   "s1": 253.9
   },
   {
    "label": "the maze core",
    "len": 138.2,
-   "s1": 380.7
+   "s1": 392.1
   },
   {
    "label": "exit hall",
    "len": 14.9,
-   "s1": 395.6
+   "s1": 407
   },
   {
    "label": "car park",
    "len": 13.5,
-   "s1": 409.1
+   "s1": 420.5
   }
  ],
  "leg_speed_scale": [
   0.873,
   1.206,
-  0.998,
+  0.723,
+  1.114,
   1.092,
   0.869
+ ],
+ "pivots": [
+  {
+   "s": 44.29637433234665,
+   "f0": 1657,
+   "f1": 1697
+  }
  ],
  "min_clearance_m": 0.794,
  "wolfgang_hits": [],

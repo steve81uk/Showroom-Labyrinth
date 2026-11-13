@@ -29,6 +29,8 @@ const F = {
   layArrow: fOf(/lays one arrow/i, 5736), ext: fOf(/car park/i, 5988), halfShelf: fOf(/half shelf/i, 6217), black: fOf(/hard cut/i, 6302)
 };
 F.door = Math.min(N - 1, F.layArrow + Math.round(2.2 * FPS));
+F.pre = Math.round((M.sections.find(x => /Pre-Chorus/.test(x.name)) || { start_s: 55.891 }).start_s * FPS);
+F.deadEnd = F.pre;
 const SPEED = { walk: 1.45, push_trolley: 1.35, run: 4.4, idle: 0, idle_trolley: 0, freeze: 0, slowmo: 0.7, turn_left: 1.3, turn_right: 1.3,
   look_left: 0.7, look_right: 0.7, look_down: 0.6, tie_thread: 0, step_back: 0 };
 const P = new Float64Array(N); { let v = 0, s = 0; for (let f = 0; f < N; f++) { const tgt = SPEED[TEL[telIdx[f]].sprite_state] ?? 1.2; v += (tgt - v) * 0.12; s += v / FPS; P[f] = s; } }
@@ -88,7 +90,7 @@ booth(-22, -6, -16, 0, 'w'); box(-19, -4.6, -16.6, -1.4, 0.6, 'bed');
 box(-29, 1.8, -26.6, 4.2, 0.6, 'bed_anchor', 'large', { anchor: true });                                    // THE display bed (thread anchor)
 box(-29.6, 2.2, -29.1, 2.8, 0.7, 'lamp_table', 'small'); box(-26.5, 2.2, -26.0, 2.8, 0.7, 'lamp_table', 'small');
 box(-22, 4, -16.4, 4.12, 2.1, 'partition'); box(-22, 4, -21.88, 9, 2.1, 'partition');                    // dividers forcing the route west
-LABELS.push({ x: -27.8, z: 0.8, text: 'ARIADNE', big: false });
+LABELS.push({ x: -27.8, z: 0.8, text: 'ARIADNE', big: false }); LABELS.push({ x: -18.6, z: 2.0, text: 'THIS WAY', big: false, glitch: true });
 
 // ---- Knossos Kitchens: worktop runs as islands (aisles between), wall units
 for (const [z, xa, xb] of [[-12.0, -35.85, -10.5], [-16.4, -31.5, -6.15], [-20.6, -35.85, -10.5]]) box(xa, z - 0.45, xb, z + 0.45, 0.92, 'worktop');
@@ -158,13 +160,14 @@ const fillet = (g, poly, rMax = 2.2) => { const out = [poly[0]];
 
 // story waypoints (each leg is solved with the doors that are open for that leg)
 const WP = {
-  outside: [-30, 30], box: [-20.6, 13.7], anchor: [-25.0, 3.0], reveal: [21, -17], servDoor: [33.5, -6.6], coreIn: [24.2, 24.0],
+  outside: [-30, 30], deadEnd: [-17.7, 2.0], box: [-20.6, 13.7], anchor: [-25.0, 3.0], reveal: [21, -17], servDoor: [33.5, -6.6], coreIn: [24.2, 24.0],
   hallIn: [0, -9.6], exitIn: [0, -24.5], car: [0, -38]
 };
 const LEGS = [  // [from, to, story distance at `to` (m of walk), doors open, label, via...]
   ['outside', 'box', 'pickBox', ['entry'], 'entrance'],
   ['box', 'anchor', 'tie', [], 'to the display bed'],
-  ['anchor', 'reveal', 'minoReveal', ['kit_hall', 'hall_ward'], 'bedrooms, kitchens, exit hall, wardrobes', [[-33, -9.4], [-7.6, -23.4], [7.6, -21]]],
+  ['anchor', 'deadEnd', 'deadEnd', [], 'wrong turn: the glitched arrows lead into a dead end'],
+  ['deadEnd', 'reveal', 'minoReveal', ['kit_hall', 'hall_ward'], 'back out; kitchens, exit hall, wardrobes', [[-33, -9.4], [-7.6, -23.4], [7.6, -21]]],
   ['reveal', 'servDoor', 'erase0', ['ward_serv'], 'MINO wakes; into service'],
   ['servDoor', 'coreIn', null, ['ward_serv', 'serv_core'], 'service corridors'],
   ['coreIn', 'hallIn', null, ['serv_core', 'hall_core'], 'the maze core'],
@@ -203,7 +206,25 @@ const S = new Float64Array(N);
 for (let f = 0; f < N; f++) { const p = P[f]; let k = 0; while (k + 1 < ANCH.length && ANCH[k + 1][0] <= p) k++;
   if (k + 1 < ANCH.length) { const [p0, s0] = ANCH[k], [p1, s1] = ANCH[k + 1], e0 = effAt(s0), e1 = effAt(s1); S[f] = sOfEff(e0 + (e1 - e0) * (p - p0) / Math.max(1e-9, p1 - p0)); }
   else { const [p0, s0] = ANCH[ANCH.length - 1]; S[f] = Math.min(LEN, s0 + (p - p0)); } }
+const PIVOTS = [];
 const legScale = []; for (let k = 1; k < ANCH.length; k++) legScale.push(+((ANCH[k][1] - ANCH[k - 1][1]) / (ANCH[k][0] - ANCH[k - 1][0])).toFixed(3));
+
+// ---------------------------------------------------------------- pivots: at a cusp he stops, turns on the spot with the trolley, then sets off
+const CUSPS = []; for (let k = 1; k < LEGINFO.length; k++) { const s0 = LEGINFO[k].s0, a = posAtS(s0 - 0.6), b = posAtS(s0), c = posAtS(s0 + 0.6);
+  const u = [b[0] - a[0], b[1] - a[1]], v = [c[0] - b[0], c[1] - b[1]], cos = (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v) || 1); if (cos < -0.2) CUSPS.push(s0); }
+const PIVOT_F = 40, PIVOT_WIN = 75;
+for (const sc of CUSPS) { let fc = 0; while (fc < N - 1 && S[fc] < sc) fc++; const fa = Math.max(0, fc - PIVOT_WIN), fb = Math.min(N - 1, fc + PIVOT_WIN), sa = S[fa], sb = S[fb], hold = (sc - sa) / Math.max(1e-9, sb - sa);
+  const h0 = (fb - fa - PIVOT_F) / 2, ss = t => t * t * (3 - 2 * t);
+  for (let f = fa; f <= fb; f++) { const k = f - fa; let g; if (k < h0) g = hold * ss(k / h0); else if (k < h0 + PIVOT_F) g = hold; else g = hold + (1 - hold) * ss((k - h0 - PIVOT_F) / h0); S[f] = sa + (sb - sa) * g; }
+  PIVOTS.push({ s: sc, f0: fa + Math.round(h0), f1: fa + Math.round(h0) + PIVOT_F }); }
+// per-frame heading: one-sided tangent near cusps (never across a reversal), rotate in place during a pivot
+const tanOneSided = s => { for (const sc of CUSPS) { if (Math.abs(s - sc) < 1.0) { const d = s <= sc ? -1 : 1; const a = posAtS(d < 0 ? s - 0.5 : s), b = posAtS(d < 0 ? s : s + 0.5); const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  if (d < 0 && s >= sc - 1e-6) { const a2 = posAtS(sc - 0.5), b2 = posAtS(sc); const l2 = Math.hypot(b2[0] - a2[0], b2[1] - a2[1]) || 1; return [(b2[0] - a2[0]) / l2, (b2[1] - a2[1]) / l2]; }
+  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; } } const a = posAtS(s - 0.25), b = posAtS(s + 0.9); const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+const YAW = new Float64Array(N); { let last = 0; for (let f = 0; f < N; f++) { const pv = PIVOTS.find(p => f >= p.f0 - 2 && f <= p.f1 + 2);
+  if (pv) { const tin = tanOneSided(pv.s - 0.05), tout = tanOneSided(pv.s + 0.05), y0 = Math.atan2(tin[0], tin[1]); let y1 = Math.atan2(tout[0], tout[1]); let d = y1 - y0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    if (Math.abs(Math.abs(d) - Math.PI) < 0.35) d = Math.PI * (d >= 0 ? 1 : -1); const u = Math.max(0, Math.min(1, (f - pv.f0) / (pv.f1 - pv.f0))); YAW[f] = y0 + d * u * u * (3 - 2 * u); }
+  else if (f > 0 && Math.abs(S[f] - S[f - 1]) < 1e-6) YAW[f] = last; else { const t = tanOneSided(S[f]); YAW[f] = Math.atan2(t[0], t[1]); } last = YAW[f]; } }
 
 // ---------------------------------------------------------------- MINO-7000: hidden in its closet until reveal, then follows the customer's route
 const SM = new Float64Array(N), minoOn = new Uint8Array(N);
@@ -247,7 +268,7 @@ const OBST = SOL.filter(s => s.layer !== 'small' || s.h > 0.5);
 const report = { wolfgang: [], trolley: [], mino: [], thread: [], doors_crossed_closed: [], min_clear: Infinity };
 const R_W = 0.42, R_M = 0.62, TROL = { w: 0.62, l: 0.95, ahead: 0.95 };
 for (let f = 0; f < N; f++) {
-  const s = S[f], w = posAtS(s), t = tanAt(s);
+  const s = S[f], w = posAtS(s), t = [Math.sin(YAW[f]), Math.cos(YAW[f])];
   for (const o of OBST) { if (rectHitCircle(o, w[0], w[1], R_W)) report.wolfgang.push([f, o.kind]);
     const dx = Math.max(o.x0 - w[0], 0, w[0] - o.x1), dz = Math.max(o.z0 - w[1], 0, w[1] - o.z1); report.min_clear = Math.min(report.min_clear, Math.hypot(dx, dz)); }
   // trolley: sample its rectangle as 6 circles
@@ -263,7 +284,7 @@ for (let f = 0; f < N; f++) {
 }
 const uniq = a => { const seen = new Map(); for (const [f, k, ...r] of a) { const key = k + (r[0] || ''); if (!seen.has(key)) seen.set(key, { first: f, last: f, n: 0, what: [k, ...r].join(' ') }); const e = seen.get(key); e.last = f; e.n++; } return [...seen.values()]; };
 const summary = { route_m: +LEN.toFixed(1), legs: LEGINFO.map(L => ({ label: L.label, len: +L.len.toFixed(1), s1: +L.s1.toFixed(1) })), leg_speed_scale: legScale,
-  min_clearance_m: +report.min_clear.toFixed(3), wolfgang_hits: uniq(report.wolfgang), trolley_hits: uniq(report.trolley), mino_hits: uniq(report.mino), thread_hits: uniq(report.thread),
+  pivots: PIVOTS, min_clearance_m: +report.min_clear.toFixed(3), wolfgang_hits: uniq(report.wolfgang), trolley_hits: uniq(report.trolley), mino_hits: uniq(report.mino), thread_hits: uniq(report.thread),
   closed_door_crossings: uniq(report.doors_crossed_closed.map(([f, who, id, o]) => [f, who, id, o])),
   pass: !report.wolfgang.length && !report.trolley.length && !report.mino.length && !report.thread.length && !report.doors_crossed_closed.length };
 fs.writeFileSync(path.join(OUT, 'nav_report.json'), JSON.stringify(summary, null, 1));
@@ -272,7 +293,7 @@ fs.writeFileSync(path.join(OUT, 'nav_report.json'), JSON.stringify(summary, null
 const sub = (arr, k = 1) => Array.from(arr).map(v => +v.toFixed(3));
 fs.writeFileSync(path.join(OUT, 'world.json'), JSON.stringify({ version: 'v10-greyblock', solids: SOL, doors: DOORS, zones: ZONES, labels: LABELS, route: ROUTE.map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]),
   route_s: sub(SL), legs: LEGINFO.map(({ grid, ...L }) => L), anchor: WP.anchor, closet: CLOSET, emerge: EMERGE, emerge_frames: KJ, wall_h: WH, spool_m: SPOOL }));
-fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify({ F, S: sub(S), SM: sub(SM), mino_on: Array.from(minoOn), s_anchor: +sAnchor.toFixed(3),
+fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify({ F, pivots: PIVOTS, yaw: sub(YAW), S: sub(S), SM: sub(SM), mino_on: Array.from(minoOn), s_anchor: +sAnchor.toFixed(3),
   door_open: doorOpen.map(a => Array.from(a, v => +v.toFixed(3))), thread: Array.from({ length: N }, (_, f) => { const t = threadSpan(f); return t ? [+t[0].toFixed(2), +t[1].toFixed(2)] : 0; }) }));
 console.log(JSON.stringify(summary, null, 1));
 process.exit(summary.pass ? 0 : 2);

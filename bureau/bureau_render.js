@@ -15,7 +15,7 @@ const PORT = Number(arg('--port', 8727));
 const STRIP = has('--strip'), MASTER = has('--master'), RANGE = has('--range'), SERVE = has('--serve'), SPOT = has('--spot');
 const PIPE = has('--pipe'); const QUALITY = arg('--quality', 'high'); const CRF = arg('--crf', '16'); const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 const TRACK_TAG = 'Bureau_Showroom_Labyrinth_v10';
-const STRIP_RANGE = [5650, 5950];   // exit hall -> doors open -> outside: the door test
+const STRIP_RANGE = [1600, 1900];   // plan glitch -> wrong turn into the dead end -> pivot -> back out: the most complex transition
 const log = (...a) => console.log(...a);
 if (!STRIP && !MASTER && !RANGE && !SERVE && !SPOT) { log('Usage: node bureau_render.js --strip | --range <a> <b> | --spot f1,f2 [--res WxH]'); process.exit(1); }
 if (!fs.existsSync(path.join(ROOT, 'bureau', 'timeline.json'))) { log('[preflight] run bureau_world.js first'); process.exit(1); }
@@ -59,12 +59,12 @@ async function sceneMain(THREE, X) {
   const canvas = $('c');
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: false, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x101418);
   const camera = new THREE.PerspectiveCamera(40, W / H, 0.5, 400);
-  const hemi = new THREE.HemisphereLight(0xdfe8f0, 0x3a3530, 1.15); scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xf2f6ff, 1.6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  const hemi = new THREE.HemisphereLight(0xd4e2f2, 0x2e3036, 1.05); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xe6f0ff, 1.5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 120 }); sun.shadow.bias = -0.0004; scene.add(sun); scene.add(sun.target);
 
   // ---------------------------------------------------------------- Bureau & Co. palette (original identity; no third-party marks)
@@ -79,14 +79,14 @@ async function sceneMain(THREE, X) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(wM, hM || wM / 4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.85 })); return m; };
 
   // ---------------------------------------------------------------- floor, zones, labels
-  const RELOC = [];
+  const RELOC = [], LURE = [], ZLAB = [];
   const store = new THREE.Group(); scene.add(store);
   { const fl = new THREE.Mesh(new THREE.PlaneGeometry(72, 52), MAT.floor); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; store.add(fl);
     const ZT = { entrance: 0xc9c0ae, bedrooms: 0xc6bba6, kitchens: 0xbfc0b9, hall: 0xb3b8b5, wardrobes: 0xc2b9ab, service: 0xa9aaa6, core: 0xbcb5a8 };
     for (const z of WD.zones) { const p = new THREE.Mesh(new THREE.PlaneGeometry(z.x1 - z.x0, z.z1 - z.z0), mat(ZT[z.id] || COL.concrete, { roughness: 0.95 }));
       p.rotation.x = -Math.PI / 2; p.position.set((z.x0 + z.x1) / 2, 0.004, (z.z0 + z.z1) / 2); p.receiveShadow = true; store.add(p);
-      const lab = textPlane(z.name, Math.min(14, (z.x1 - z.x0) * 0.8), '#1f5f6bcc'); lab.rotation.x = -Math.PI / 2; lab.position.set((z.x0 + z.x1) / 2, 0.02, z.z0 + 1.6); store.add(lab); }
-    for (const l of WD.labels) { const t = textPlane(l.text, l.big ? 9 : 6, l.big ? '#b3261e' : '#34373c'); t.rotation.x = -Math.PI / 2; t.position.set(l.x, 0.025, l.z); store.add(t); if (/RELOCATED/.test(l.text)) RELOC.push(t); } }
+      const lab = textPlane(z.name, Math.min(14, (z.x1 - z.x0) * 0.8), '#1f5f6bcc'); lab.rotation.x = -Math.PI / 2; lab.position.set((z.x0 + z.x1) / 2, 0.02, z.z0 + 1.6); store.add(lab); ZLAB.push([lab, lab.position.clone()]); }
+    for (const l of WD.labels) { const t = textPlane(l.text, l.big ? 9 : 6, l.big ? '#b3261e' : '#34373c'); t.rotation.x = -Math.PI / 2; t.position.set(l.x, 0.025, l.z); store.add(t); if (/RELOCATED/.test(l.text)) RELOC.push(t); if (l.glitch) LURE.push(t); } }
   // outside: car park (night), entrance apron
   { const ap = new THREE.Mesh(new THREE.PlaneGeometry(80, 26), mat(0x2b2d31, { roughness: 0.95 })); ap.rotation.x = -Math.PI / 2; ap.position.set(0, -0.01, -39); ap.receiveShadow = true; scene.add(ap);
     const ap2 = new THREE.Mesh(new THREE.PlaneGeometry(80, 10), mat(0x3a3c40)); ap2.rotation.x = -Math.PI / 2; ap2.position.set(0, -0.01, 31); scene.add(ap2);
@@ -135,13 +135,17 @@ async function sceneMain(THREE, X) {
     for (const lf of D.leaves) { if (lf.userData.swing) lf.rotation.y = -o * Math.PI / 2 * 0.95; else lf.position.x = lf.userData.closed + lf.userData.sd * o * (D.d.w / 2 - 0.05); }
     if (D.shutter) { const up = f >= F.layArrow ? smooth((f - F.layArrow) / 40) : 0; D.shutter.position.y = 1.4 + up * 2.6; D.shutter.userData.lab.visible = up < 0.5; } } };
 
-  // ---------------------------------------------------------------- floor route arrows (store customer route): every 3.2 m, pointing ALONG travel
-  { const pts = [], step = 3.2; const tri = (p, t, n) => { const P = (u, v) => [p.x + t.x * u + n.x * v, 0.03, p.z + t.z * u + n.z * v];
-      const q = [P(0.45, 0), P(0.0, -0.32), P(0.0, 0.32), P(0.02, -0.12), P(0.02, 0.12), P(-0.4, -0.12), P(-0.4, 0.12)];
-      pts.push(...q[0], ...q[2], ...q[1], ...q[3], ...q[4], ...q[5], ...q[4], ...q[6], ...q[5]); };
-    for (let s = 1.6; s < F_DOOR_S(); s += step) { const p = posAt(s), t = headAt(s), n = V3(-t.z, 0, t.x); tri(p.add(n.clone().multiplyScalar(0.55)), t, n); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.computeVertexNormals();
-    store.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: COL.mustard, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x3a2a00 }))); }
+  // ---------------------------------------------------------------- floor route arrows: instanced; local arrow points +z, yaw = atan2(t.x, t.z) maps +z onto travel
+  const GLITCH0 = F.pre - 75, GLITCH1 = F.snap, PV = (TL.pivots || [])[0];
+  const arrowGeo = (() => { const v = [[0, 0.45], [-0.32, 0], [0.32, 0], [-0.12, 0.02], [0.12, 0.02], [-0.12, -0.4], [0.12, -0.4]]; const P = i => [v[i][0], 0, v[i][1]];
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...P(0), ...P(1), ...P(2), ...P(3), ...P(5), ...P(4), ...P(4), ...P(5), ...P(6)], 3)); g.computeVertexNormals(); return g; })();
+  const ARW = []; for (let s0 = 1.6; s0 < S[F.door]; s0 += 3.2) { const p = posAt(s0), t = headAt(s0), n = V3(-t.z, 0, t.x); ARW.push({ s: s0, p: p.add(n.multiplyScalar(0.55)).setY(0.03), yaw: Math.atan2(t.x, t.z), detour: PV ? Math.abs(s0 - PV.s) < 7.5 : false }); }
+  const arrows = new THREE.InstancedMesh(arrowGeo, new THREE.MeshStandardMaterial({ color: COL.mustard, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x3a2a00 }), ARW.length); store.add(arrows);
+  const dmy = new THREE.Object3D(), hsh = (a, b) => { let h = Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263); h = Math.imul(h ^ h >>> 13, 1274126177); return ((h ^ h >>> 16) >>> 0) / 4294967296; };
+  const updateArrows = (f, wpos) => { const g = f >= GLITCH0 && f < GLITCH1 ? smooth((f - GLITCH0) / 20) * (1 - smooth((f - GLITCH1 + 10) / 10)) : 0;
+    ARW.forEach((a, i) => { let yaw = a.yaw, sc = 1; if (a.detour && f >= GLITCH1) sc = 0;                    // the store corrects itself: the dead-end arrows vanish at the snap
+      if (g > 0 && a.p.distanceTo(wpos) < 28) { const j = Math.floor(f / 4); yaw += g * (hsh(i, j) - 0.5) * 5.5; if (hsh(i, j + 99) < 0.12 * g) sc = 0; }
+      dmy.position.copy(a.p); dmy.rotation.set(0, yaw, 0); dmy.scale.setScalar(sc); dmy.updateMatrix(); arrows.setMatrixAt(i, dmy.matrix); }); arrows.instanceMatrix.needsUpdate = true; return g; };
   function F_DOOR_S() { return S[F.door]; }
 
   // ---------------------------------------------------------------- Wolfgang placeholder: wolf + top hat + velvet coat + brass lantern + trolley (reads from above)
@@ -158,7 +162,7 @@ async function sceneMain(THREE, X) {
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.142, 0.142, 0.05, 20), mat(COL.red)); band.position.y = 0.05; hat.add(band);
   const lantern = new THREE.Group(); lantern.position.set(0.38, 0.85, 0.05); wolf.add(lantern);
   lantern.add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.14), mat(0xb08a3a, { metalness: 0.9, roughness: 0.35 })));
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb347 })); lantern.add(flame);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.9, 0.6) })); lantern.add(flame);
   const lanternLight = new THREE.PointLight(0xffa640, 6, 7, 2); lantern.add(lanternLight);
   const feet = [-1, 1].map(sd => { const f_ = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.26), mat(0x1a1a1c)); f_.position.set(sd * 0.12, 0.04, 0); wolf.add(f_); return f_; });
   const trolley = new THREE.Group(); scene.add(trolley);
@@ -177,12 +181,22 @@ async function sceneMain(THREE, X) {
     const hood = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.45, 0.9), steel); hood.position.set(0, 0.85, -0.1); mino.add(hood);
     const headM = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.5), steel); headM.position.set(0, 1.1, 0.5); mino.add(headM);
     for (const sd of [-1, 1]) { const horn = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.6, 10), mat(0xe8e2d4, { roughness: 0.4 })); horn.position.set(sd * 0.42, 1.4, 0.48); horn.rotation.z = -sd * 1.0; mino.add(horn); }
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a1a })); eye.position.set(0, 1.12, 0.76); mino.add(eye);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.5, 0.35, 0.2) })); eye.position.set(0, 1.12, 0.76); mino.add(eye);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 24), mat(0xc8b27a, { metalness: 1, roughness: 0.3 })); ring.position.set(0, 0.92, 0.77); mino.add(ring);
     mino.traverse(o => { if (o.isMesh) o.castShadow = true; }); }
   const brushes = [-0.28, 0.28].map(x => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 20), mat(0x1c1c1e)); b.position.set(x, 0.08, 0.1); mino.add(b);
     const bar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.05), mat(0xe8e2d4)); bar.position.y = 0.05; b.add(bar); return b; });
   const sensorLight = new THREE.SpotLight(0xff2a1a, 30, 16, 0.32, 0.6, 1.5); sensorLight.position.set(0, 1.1, 0.8); mino.add(sensorLight); mino.add(sensorLight.target); sensorLight.target.position.set(0, 0, 6);
+  const fan = new THREE.Mesh(new THREE.CircleGeometry(11, 32, -0.3 + Math.PI / 2, 0.6), new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+  fan.rotation.x = -Math.PI / 2; const fanPivot = new THREE.Group(); fanPivot.add(fan); scene.add(fanPivot);
+  // sensor yaw per frame: sweeps +-60 deg until Wolfgang falls inside the beam within 16 m (detection), then locks on with a limited turn rate
+  const SENS = new Float32Array(N); let DETECT = -1; { let ys = 0;
+    for (let f = F.minoReveal; f < N; f++) { const m = minoXZ(f); if (!m) continue; const nx = minoXZ(Math.min(N - 1, f + 1)) || m, body = (f - F.minoReveal < WD.emerge_frames) ? Math.atan2(nx.x - m.x, nx.z - m.z) : Math.atan2(...(() => { const h_ = headAt(SM[f]); return [h_.x, h_.z]; })());
+      const w = posAt(S[f]), toW = Math.atan2(w.x - m.x, w.z - m.z); let tgt;
+      if (DETECT < 0) { tgt = body + Math.sin((f - F.minoReveal) / FPS * 2.4) * 1.05; let d = toW - tgt; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+        if (f - F.minoReveal > WD.emerge_frames && Math.abs(d) < 0.25 && m.distanceTo(w) < 16) DETECT = f; }
+      else tgt = toW;
+      let d = tgt - ys; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; ys += clamp(d, -0.12, 0.12); SENS[f] = ys; } }
   const warnRing = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.62, 48), new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false }));
   warnRing.rotation.x = -Math.PI / 2; scene.add(warnRing);
 
@@ -193,7 +207,7 @@ async function sceneMain(THREE, X) {
     for (let i = 0; i < R.maxN; i++) { const s = a + (b - a) * Math.min(1, i / (n - 1)), p = posAt(s), t = headAt(s), nx = -t.z, nz = t.x;
       pos.set([p.x + nx * (off - w / 2), y, p.z + nz * (off - w / 2), p.x + nx * (off + w / 2), y, p.z + nz * (off + w / 2)], i * 6); }
     R.g.attributes.position.needsUpdate = true; R.g.setDrawRange(0, (n - 1) * 6); R.m.visible = b > a; };
-  const thread = ribbon(new THREE.MeshBasicMaterial({ color: 0xffa21f }), 2400);
+  const thread = ribbon(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.75, 0.78, 0.1) }), 2400);
   const trail = ribbon(new THREE.MeshBasicMaterial({ color: 0xf4f7fb, transparent: true, opacity: 0.35, depthWrite: false }), 200);
 
   // ---------------------------------------------------------------- overhead Bureau floor-plan camera (primary camera, all song)
@@ -211,7 +225,7 @@ async function sceneMain(THREE, X) {
   // ---------------------------------------------------------------- HUD: diegetic Bureau receipt + debug
   const SPOOL = WD.spool_m;
   function hud(f) { const th = TL.thread[f], used = th ? th[1] - TL.s_anchor : 0, m = minoXZ(f), w = posAt(S[f]);
-    const d = m && TL.mino_on[f] ? m.distanceTo(w) : Infinity, prox = d < 6 ? '<b class="r">DANGER</b>' : d < 14 ? '<b class="a">CAUTION</b>' : 'CLEAR';
+    const d = m && TL.mino_on[f] ? m.distanceTo(w) : Infinity, prox = DETECT < 0 || f < DETECT ? 'SCANNING' : d < 6 ? '<b class="r">DANGER</b>' : d < 14 ? '<b class="a">CAUTION</b>' : 'TRACKING';
     const parts = f >= F.halfShelf ? '1 / 2' : f >= F.pickBox ? '1 / 2 (BOXED)' : '0 / 2';
     const exit = f >= F.layArrow ? 'OPEN' : 'RELOCATED';
     $('rcpt').innerHTML = `<div class="hd">BUREAU &amp; CO.</div><div class="sl">HOME, ADMINISTERED.</div><hr>
@@ -220,9 +234,15 @@ async function sceneMain(THREE, X) {
     if (DEBUG) { const t = f / FPS, b = beatAt(t), tel = telAt(f), sec = secAt(f).name, zn = WD.zones.find(z => w.x >= z.x0 && w.x <= z.x1 && w.z >= z.z0 && w.z <= z.z1);
       $('debug').textContent = `FRAME ${f} / ${N}  T ${t.toFixed(3)} s  @ ${FPS} fps  ${W}x${H}\nBPM manifest ${M.bpm}  beat ${b}  bar ${(b / 4 + 1).toFixed(1)}\nSECTION ${sec}  STATE ${tel.sprite_state}  CAM ${tel.camera_mode || '-'}\nEVENT ${String(tel.special_events || '').slice(0, 60)}\nZONE ${zn ? zn.name : 'OUTSIDE'}  s ${S[f].toFixed(1)} / ${LEN.toFixed(1)} m  NAV TEST PASS` + (m && TL.mino_on[f] ? `  MINO ${d.toFixed(1)} m` : ''); } }
 
+  // ---------------------------------------------------------------- post: bloom for the bright elements (thread, lantern, sensor), film grain for the field-recording feel
+  const composer = new X.EffectComposer(renderer); composer.setPixelRatio(1); composer.setSize(W, H); composer.addPass(new X.RenderPass(scene, camera));
+  const bloom = new X.UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.45, 0.92); composer.addPass(bloom);
+  const grain = new X.ShaderPass({ uniforms: { tDiffuse: { value: null }, uT: { value: 0 }, uAmt: { value: 0.045 } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+    fragmentShader: 'uniform sampler2D tDiffuse; uniform float uT, uAmt; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uT) * 43758.5453); }\n void main(){ vec4 c = texture2D(tDiffuse, vUv); float n = h(vUv * 1000.0) - 0.5; vec2 q = vUv - 0.5; float v = 1.0 - dot(q, q) * 0.55; gl_FragColor = vec4(c.rgb * v + n * uAmt, c.a); }' });
+  composer.addPass(grain); composer.addPass(new X.OutputPass());
   // ---------------------------------------------------------------- frame
   window.renderFrame = f => { f = clamp(f | 0, 0, N - 1);
-    const s = S[f], P = posAt(s), h = headAt(s), yaw = Math.atan2(h.x, h.z), sp = Math.abs(S[f] - S[Math.max(0, f - 1)]) * FPS;
+    const s = S[f], P = posAt(s), yaw = TL.yaw[f], h = V3(Math.sin(yaw), 0, Math.cos(yaw)), sp = Math.abs(S[f] - S[Math.max(0, f - 1)]) * FPS;
     wolf.position.copy(P); wolf.rotation.y = yaw;
     const ph = s / 0.75 * Math.PI, step = Math.min(1, sp / 1.4); feet[0].position.z = Math.sin(ph) * 0.22 * step; feet[1].position.z = -Math.sin(ph) * 0.22 * step;
     feet[0].position.y = 0.04 + Math.max(0, Math.cos(ph)) * 0.06 * step; feet[1].position.y = 0.04 + Math.max(0, -Math.cos(ph)) * 0.06 * step;
@@ -233,19 +253,23 @@ async function sceneMain(THREE, X) {
     else if (f >= F.door) { const ps = posAt(S[F.door] - 2); trolley.visible = true; trolley.position.copy(ps); trolley.rotation.y = Math.atan2(headAt(S[F.door] - 2).x, headAt(S[F.door] - 2).z) + 0.5; }
     trolley.userData.box.visible = f >= F.pickBox && f < F.door; bag.visible = f >= F.door;
     // MINO
-    const m = minoXZ(f), on = m && TL.mino_on[f]; mino.visible = !!on; warnRing.visible = !!on; trail.m.visible = !!on;
+    const m = minoXZ(f), on = m && TL.mino_on[f]; mino.visible = !!on; warnRing.visible = !!on; trail.m.visible = !!on; fanPivot.visible = !!on;
     if (on) { const k = f - F.minoReveal; let mh; if (k < WD.emerge_frames) { const m2 = minoXZ(f + 1) || m; mh = m2.clone().sub(m); if (mh.lengthSq() < 1e-6) mh = V3(0, 0, 1); mh.normalize(); } else mh = headAt(SM[f]);
       mino.position.copy(m); mino.rotation.y = Math.atan2(mh.x, mh.z); brushes.forEach((b, i) => b.rotation.y = f * 0.6 * (i ? -1 : 1));
-      const d = m.distanceTo(P), alert = clamp((14 - d) / 8, 0, 1); warnRing.position.set(m.x, 0.05, m.z); warnRing.material.opacity = alert * (0.55 + 0.45 * Math.sin(f * 0.5));
+      const d = m.distanceTo(P), alert = DETECT >= 0 && f >= DETECT ? clamp((16 - d) / 8, 0.35, 1) : 0; fanPivot.position.set(m.x, 0.04, m.z); fanPivot.rotation.y = SENS[f]; fan.material.opacity = DETECT >= 0 && f >= DETECT ? 0.3 : 0.18 + 0.06 * Math.sin(f * 0.4);
+      sensorLight.target.position.set(Math.sin(SENS[f] - mino.rotation.y) * 6, 0, Math.cos(SENS[f] - mino.rotation.y) * 6); warnRing.position.set(m.x, 0.05, m.z); warnRing.material.opacity = alert * (0.55 + 0.45 * Math.sin(f * 0.5));
       warnRing.scale.setScalar(1 + 0.25 * Math.sin(f * 0.25)); sensorLight.intensity = 20 + 25 * alert;
       if (k >= WD.emerge_frames) setRibbon(trail, Math.max(0, SM[f] - 14), SM[f] - 0.5, 0.95, 0.012); else trail.m.visible = false; }
     // thread
     const th = TL.thread[f]; if (th) setRibbon(thread, th[0], th[1], 0.07, 0.022, -0.18); else thread.m.visible = false;
     updateDoors(f); RELOC.forEach(o => o.visible = f < F.layArrow);
+    const gl = updateArrows(f, P); LURE.forEach(o => o.visible = gl > 0.05);
+    ZLAB.forEach(([o, p0], i) => { o.position.copy(p0); if (gl > 0) { o.position.x += (hsh(i, f >> 2) - 0.5) * 1.6 * gl; o.material.opacity = 0.85 * (1 - 0.5 * gl * hsh(i + 7, f >> 1)); } else o.material.opacity = 0.85; });
+    document.body.style.setProperty('--gl', gl.toFixed(3)); $('glitch').style.opacity = gl;
     // camera
     const c = camAt(f); CEIL.forEach(o => o.visible = c.pos.y > 40); camera.position.copy(c.pos); camera.lookAt(c.look); camera.fov = c.fov; camera.updateProjectionMatrix();
     sun.position.copy(c.look).add(V3(-14, 40, 18)); sun.target.position.copy(c.look); const ext = f >= F.ext; hemi.intensity = ext ? 0.55 : 1.15; scene.background.setHex(ext ? 0x0a0e16 : 0x101418);
-    hud(f); renderer.render(scene, camera); return true; };
+    hud(f); grain.uniforms.uT.value = (f % 97) * 1.37; composer.render(); return true; };
   window.exportTelemetry = r => ({ track_name: M.track_name, bpm: M.bpm, resolution_target: r, total_frames_at_30fps: N, telemetry: M.telemetry });
   window.engineReport = { engine: 'v10-bureau-greyblock', frames: N, route_m: +LEN.toFixed(1), doors: WD.doors.length, solids: WD.solids.length };
   window.renderFrame(0); window.engineReady = true;
@@ -259,14 +283,21 @@ const PAGE_CSS = `html,body{margin:0;background:#000;overflow:hidden}:root{--u:m
 #rcpt .hd{font-family:"DejaVu Sans",sans-serif;font-weight:800;letter-spacing:.18em;color:#1f5f6b;font-size:calc(2.3*var(--u))}#rcpt .sl{color:#8a6d1e;letter-spacing:.14em;font-size:calc(1.3*var(--u))}
 #rcpt hr{border:0;border-top:.2vh dashed #23262a66;margin:.8vh 0}#rcpt .ft{color:#6b6e72;font-size:calc(1.2*var(--u))}#rcpt b.r{color:#b3261e}#rcpt b.a{color:#a8801a}
 body.clean #rcpt{display:none}
+#glitch{position:absolute;inset:0;opacity:0;background:repeating-linear-gradient(0deg,#1f5f6b22 0 2px,transparent 2px 6px);mix-blend-mode:screen}
+#glitch::after{content:'FLOOR PLAN UPDATING';position:absolute;right:3vw;top:3vh;font:700 calc(2*var(--u)) 'DejaVu Sans Mono',monospace;color:#1fd0e0;letter-spacing:.2em;background:#04141ad0;padding:.5vh 1.2vh;border:1px solid #1fd0e0}
 #debug:empty{display:none}#debug{position:absolute;left:1.2vw;bottom:2vh;font-size:calc(1.45*var(--u));line-height:1.35;background:#000000c8;color:#9fff9f;padding:1vh 1.2vh;border:1px solid #3a3;white-space:pre}`;
 function pageHTML(q) { return `<!doctype html><html><head><meta charset="utf-8"><style>${PAGE_CSS}</style>
 <script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script></head>
-<body><canvas id="c"></canvas><div id="ov"><div id="rcpt"></div><div id="debug"></div></div><script type="module" src="/__scene.js?${q}"></script></body></html>`; }
+<body><canvas id="c"></canvas><div id="ov"><div id="glitch"></div><div id="rcpt"></div><div id="debug"></div></div><script type="module" src="/__scene.js?${q}"></script></body></html>`; }
 const SCENE_JS = `import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const sceneMain = ${sceneMain.toString()};
-sceneMain(THREE, { BufferGeometryUtils }).catch(e => { window.engineError = String(e && e.stack || e); console.error('ENGINE ERROR', e); });`;
+sceneMain(THREE, { BufferGeometryUtils, EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, OutputPass }).catch(e => { window.engineError = String(e && e.stack || e); console.error('ENGINE ERROR', e); });`;
 
 const MIME = { '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.wav': 'audio/wav' };
 function startServer(port) {

@@ -54,9 +54,26 @@ Walk-speed scale per leg: 0.87, 1.21, 1.00, 1.09, 0.87.
 - **The HUD** is a Bureau receipt: customer status, objective, shelf parts, thread remaining, MINO proximity and exit status.
 - **Identity:** BUREAU & CO., "HOME, ADMINISTERED.", deep teal, mustard, Bureau red. No third-party marks.
 
+## v10b: story mechanics and lighting test
+
+- **Wrong turn the thread records:**
+  - The pre-chorus glitch starts 2.5 s early, with "FLOOR PLAN UPDATING", scrambled arrows and jittering zone labels.
+  - A "THIS WAY" sign lures him into a real dead-end pocket between the bedroom displays, which he reaches on the pre-chorus downbeat.
+  - He stops, pivots on the spot with the trolley (40 frames), and walks back out.
+  - The thread lies along the detour and back. At the chorus snap the store "corrects" itself: arrows realign and the detour's arrows vanish.
+  - The pivot is in the collision test: the trolley follows the per-frame heading through the 180-degree turn. Still a PASS.
+- **Per-frame heading** (`timeline.yaw`) comes from the world builder, using one-sided tangents near reversals.
+- **MINO detection:** a red sensor fan sweeps +-60 degrees (HUD: SCANNING) until Wolfgang is in the beam within 16 m. It then locks on with a limited turn rate (TRACKING, CAUTION, DANGER).
+- **Arrows** are instanced. The local arrow points +z, and yaw = atan2(t.x, t.z) maps it onto travel.
+- **Lighting test:**
+  - a colder showroom;
+  - HDR amber thread, lantern flame and sensor eye;
+  - UnrealBloom (threshold 0.92);
+  - film grain and vignette.
+- **Test strip:** frames 1600 to 1900 (glitch, wrong turn, pivot).
+
 ## Not yet done (later passes)
 
-- Floor-plan glitch and route rearranging in the pre-chorus.
 - Thread reel-back.
 - Wolfgang's final character rig in this world.
 - Lighting pass, then the beauty pass.
